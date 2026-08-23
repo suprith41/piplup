@@ -73,8 +73,8 @@ export async function executeRecovery(
       referenceId: `plp_${caseId}_${decision.mutation}`.slice(0, 40),
       description:
         decision.mutation === "mandate_reauth"
-          ? `Piplup re-auth · ${c.customerName} · ${c.id}`
-          : `Piplup recovery · ${c.customerName} · ${c.id}`,
+          ? `Eureka Labs · restart AutoPay · ${c.customerName}`
+          : `Eureka Labs · AI/ML course payment · ${c.customerName}`,
       customerName: c.customerName,
       notes: {
         case_id: c.id,

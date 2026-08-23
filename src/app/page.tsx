@@ -14,10 +14,11 @@ export default function Page() {
     <main className="mx-auto max-w-6xl px-6 py-10">
       <header className="flex flex-wrap items-end justify-between gap-6 border-b border-ink/15 pb-8">
         <div>
-          <p className="mono text-xs uppercase tracking-[0.2em] text-ink/50">Track 03 · AI Revenue Recovery</p>
+          <p className="mono text-xs uppercase tracking-[0.2em] text-ink/50">Track 03 · Eureka Labs · AI/ML courses</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">Piplup</h1>
           <p className="mt-3 max-w-xl text-sm leading-6 text-ink/70">
-            Stripe&apos;s method on Indian rails. Type the decline, mutate the next attempt, cascade now or dunning later. Beat calendar T+3 on the same batch.
+            Recovery desk for Eureka Labs — an online AI/ML course subscription. Type the decline, mutate the next
+            attempt, cascade now or dunning later. Beat calendar T+3 on the same batch.
           </p>
         </div>
         <div className="mono text-right text-xs text-ink/50">

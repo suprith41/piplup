@@ -104,8 +104,9 @@ export function RecoverLive() {
           <p className="mono text-[11px] uppercase tracking-wider text-moss">Live · Razorpay Test Mode</p>
           <h2 className="mt-1 text-lg font-semibold">Create recovery Payment Links</h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-ink/65">
-            Policy grants first. Then we mint a real test-mode link for three demo cases only — expired card, paused
-            mandate, checkout drop. Test accounts cap at 30 links, so the batch itself stays simulated.
+            Eureka Labs students whose AI/ML subscription failed. Policy grants first. Then we mint a real test-mode
+            link for three demo cases only — expired card, paused mandate, checkout drop. Test accounts cap at 30
+            links, so the batch itself stays simulated.
           </p>
         </div>
         <div className="mono text-right text-[11px] text-ink/45">
@@ -150,8 +151,8 @@ export function RecoverLive() {
         <p className="mono text-[11px] uppercase tracking-wider text-ink/45">Reminder email</p>
         <h3 className="mt-1 text-base font-semibold">Send a reminder</h3>
         <p className="mt-2 max-w-xl text-sm leading-6 text-ink/65">
-          Pick who should get the Hinglish nudge. Tick one, two, or all three. The mail includes the Payment Link if you
-          already created it.
+          Pick which Eureka Labs student should get the Hinglish nudge. Tick one, two, or all three. The mail includes
+          the Payment Link if you already created it.
         </p>
 
         <ul className="mt-4 space-y-2">

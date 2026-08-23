@@ -15,8 +15,8 @@ const mono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Piplup — Adaptive Recovery",
-  description: "Stripe-style two-clock recovery on Indian rails. Track 03.",
+  title: "Piplup — Eureka Labs recovery",
+  description: "Adaptive recovery for Eureka Labs online AI/ML course subscriptions. Track 03.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

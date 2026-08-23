@@ -2,7 +2,7 @@
 
 Track 03 — AI Revenue Recovery for the [Razorpay AI Buildathon](https://razorpay.com/buildathon/).
 
-Stripe-style **two-clock recovery** on Indian rails. Not a retry bot.
+Stripe-style **two-clock recovery** on Indian rails, demoed as the recovery desk for **Eureka Labs** — an online AI/ML course subscription. Not a retry bot.
 
 - Type the decline first.
 - Mutate the next attempt. Do not replay the same debit.
