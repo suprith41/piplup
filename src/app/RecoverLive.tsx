@@ -151,8 +151,8 @@ export function RecoverLive() {
         <p className="mono text-[11px] uppercase tracking-wider text-ink/45">Reminder email</p>
         <h3 className="mt-1 text-base font-semibold">Send a reminder</h3>
         <p className="mt-2 max-w-xl text-sm leading-6 text-ink/65">
-          Pick which Eureka Labs student should get the Hinglish nudge. Tick one, two, or all three. The mail includes
-          the Payment Link if you already created it.
+          Pick who gets mail. Each problem gets a different English note — AutoPay paused, card expired, or leftover
+          checkout. Tick one, two, or all three. The Payment Link is included if you already created it.
         </p>
 
         <ul className="mt-4 space-y-2">

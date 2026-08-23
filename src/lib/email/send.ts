@@ -1,8 +1,6 @@
 import nodemailer from "nodemailer";
 import { findLink } from "../razorpay/audit.ts";
-import { hinglishNudge } from "../recovery/copy.ts";
-import { grantAdaptive } from "../recovery/policy.ts";
-import { caseById } from "../razorpay/executor.ts";
+import { mailToHtml, mailToText, punchyMail } from "./copy.ts";
 import { allowedInboxes, DEMO_INBOXES, type DemoInbox } from "./recipients.ts";
 
 export function mailStatus(): { configured: boolean; from: string } {
@@ -30,29 +28,13 @@ function transporter() {
 }
 
 function bodyFor(inbox: DemoInbox): { subject: string; text: string; html: string } {
-  const c = caseById(inbox.caseId);
-  const decision = c ? grantAdaptive(c) : undefined;
-  const nudge = c && decision ? hinglishNudge(c, decision) : `${inbox.name}, payment fail ho gaya.`;
   const link = findLink(inbox.caseId)?.shortUrl;
-
-  const subject = `Eureka Labs · ${inbox.name}, AI/ML course payment pending`;
-  const text = [
-    `Hi ${inbox.name},`,
-    "",
-    nudge,
-    link ? `Pay / fix AutoPay here: ${link}` : "Payment link will appear after you create the test links.",
-    "",
-    "— Eureka Labs (online AI/ML courses · Piplup recovery · Razorpay test mode)",
-  ].join("\n");
-
-  const html = `
-    <p>Hi ${inbox.name},</p>
-    <p>${nudge}</p>
-    ${link ? `<p><a href="${link}">Pay / restart your Eureka Labs subscription</a></p>` : "<p>Create the test Payment Links first, then send again.</p>"}
-    <p style="color:#666;font-size:12px">Eureka Labs · online AI/ML courses · Piplup recovery · Razorpay test mode</p>
-  `;
-
-  return { subject, text, html };
+  const mail = punchyMail(inbox, link);
+  return {
+    subject: mail.subject,
+    text: mailToText(mail, link),
+    html: mailToHtml(mail, link),
+  };
 }
 
 export async function sendReminders(emails: string[]): Promise<Array<{ email: string; name: string; ok: boolean; error?: string }>> {
