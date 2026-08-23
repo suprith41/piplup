@@ -32,6 +32,7 @@ export function RecoverLive() {
   const [picked, setPicked] = useState<string[]>([]);
   const [mailBusy, setMailBusy] = useState(false);
   const [mailNote, setMailNote] = useState<string | null>(null);
+  const [quota, setQuota] = useState<Record<string, { sent: number; left: number }>>({});
 
   useEffect(() => {
     void fetch("/api/razorpay/status")
@@ -40,15 +41,24 @@ export function RecoverLive() {
     void fetch("/api/recover")
       .then((r) => r.json())
       .then((d: { audit?: Row[] }) => setRows(d.audit ?? []));
-    void fetch("/api/remind")
-      .then((r) => r.json())
-      .then((d: { configured?: boolean; inboxes?: Inbox[] }) => {
-        setMailReady(Boolean(d.configured));
-        const list = d.inboxes ?? [];
-        setInboxes(list);
-        setPicked(list.map((row) => row.email));
-      });
+    void loadMail();
   }, []);
+
+  async function loadMail() {
+    const res = await fetch("/api/remind");
+    const d = (await res.json()) as {
+      configured?: boolean;
+      inboxes?: Inbox[];
+      quota?: Array<{ email: string; sent: number; left: number }>;
+    };
+    setMailReady(Boolean(d.configured));
+    const list = d.inboxes ?? [];
+    setInboxes(list);
+    setPicked((cur) => (cur.length ? cur : list.map((row) => row.email)));
+    const next: Record<string, { sent: number; left: number }> = {};
+    for (const row of d.quota ?? []) next[row.email] = { sent: row.sent, left: row.left };
+    setQuota(next);
+  }
 
   async function run(injectTimeout = false) {
     setBusy(true);
@@ -80,16 +90,22 @@ export function RecoverLive() {
       });
       const data = (await res.json()) as {
         error?: string;
-        results?: Array<{ email: string; name: string; ok: boolean; error?: string }>;
+        results?: Array<{ email: string; name: string; ok: boolean; error?: string; sent?: number; left?: number }>;
       };
       if (!res.ok) throw new Error(data.error ?? "send failed");
-      const ok = (data.results ?? []).filter((r) => r.ok).map((r) => r.name);
+      const ok = (data.results ?? []).filter((r) => r.ok);
       const bad = (data.results ?? []).filter((r) => !r.ok);
       setMailNote(
-        bad.length
-          ? `Sent to ${ok.join(", ") || "nobody"}. Failed: ${bad.map((r) => r.error).join("; ")}`
-          : `Sent to ${ok.join(", ")}. Check those inboxes (and spam).`,
+        [
+          ok.length
+            ? `Sent: ${ok.map((r) => `${r.name} (${r.sent}/20, ${r.left} left)`).join(", ")}`
+            : "",
+          bad.length ? `Failed: ${bad.map((r) => `${r.name}: ${r.error}`).join("; ")}` : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       );
+      await loadMail();
     } catch (err) {
       setMailNote(err instanceof Error ? err.message : "send failed");
     } finally {
@@ -174,6 +190,11 @@ export function RecoverLive() {
                   <span className="text-ink/50">({inbox.decline})</span>
                   <br />
                   <span className="mono text-xs text-ink/55">{inbox.email}</span>
+                  <span className="ml-2 text-xs text-ink/40">
+                    {quota[inbox.email]
+                      ? `${quota[inbox.email].sent}/20 sent · ${quota[inbox.email].left} left`
+                      : "0/20 sent"}
+                  </span>
                 </span>
               </label>
             </li>

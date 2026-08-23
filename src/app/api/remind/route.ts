@@ -1,3 +1,4 @@
+import { quotaSnapshot } from "@/lib/email/quota";
 import { DEMO_INBOXES, mailStatus, sendReminders } from "@/lib/email/send";
 
 export const dynamic = "force-dynamic";
@@ -6,6 +7,8 @@ export function GET() {
   return Response.json({
     ...mailStatus(),
     inboxes: DEMO_INBOXES,
+    quota: quotaSnapshot(DEMO_INBOXES.map((row) => row.email)),
+    maxPerPerson: 20,
   });
 }
 

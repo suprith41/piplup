@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { findLink } from "../razorpay/audit.ts";
 import { mailToHtml, mailToText, punchyMail } from "./copy.ts";
+import { MAX_SENDS_PER_INBOX, remaining, recordSend, sentCount } from "./quota.ts";
 import { allowedInboxes, DEMO_INBOXES, type DemoInbox } from "./recipients.ts";
 
 export function mailStatus(): { configured: boolean; from: string } {
@@ -37,7 +38,9 @@ function bodyFor(inbox: DemoInbox): { subject: string; text: string; html: strin
   };
 }
 
-export async function sendReminders(emails: string[]): Promise<Array<{ email: string; name: string; ok: boolean; error?: string }>> {
+export async function sendReminders(
+  emails: string[],
+): Promise<Array<{ email: string; name: string; ok: boolean; error?: string; sent?: number; left?: number }>> {
   const targets = allowedInboxes(emails);
   if (targets.length === 0) {
     throw new Error("Pick at least one of the three demo inboxes.");
@@ -48,7 +51,20 @@ export async function sendReminders(emails: string[]): Promise<Array<{ email: st
   const results: Array<{ email: string; name: string; ok: boolean; error?: string }> = [];
 
   for (const inbox of targets) {
+    const used = sentCount(inbox.email);
+    if (used >= MAX_SENDS_PER_INBOX) {
+      results.push({
+        email: inbox.email,
+        name: inbox.name,
+        ok: false,
+        error: `Cap reached (${MAX_SENDS_PER_INBOX} reminders).`,
+      });
+      continue;
+    }
+
+    const n = used + 1;
     const content = bodyFor(inbox);
+
     try {
       await mail.sendMail({
         from: `Eureka Labs <${from}>`,
@@ -56,8 +72,18 @@ export async function sendReminders(emails: string[]): Promise<Array<{ email: st
         subject: content.subject,
         text: content.text,
         html: content.html,
+        headers: {
+          "X-Piplup-Send": String(n),
+        },
       });
-      results.push({ email: inbox.email, name: inbox.name, ok: true });
+      recordSend(inbox.email);
+      results.push({
+        email: inbox.email,
+        name: inbox.name,
+        ok: true,
+        sent: n,
+        left: remaining(inbox.email),
+      });
     } catch (error) {
       results.push({
         email: inbox.email,

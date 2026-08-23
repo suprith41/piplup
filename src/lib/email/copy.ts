@@ -9,10 +9,6 @@ export interface PunchyMail {
   ps: string;
 }
 
-/**
- * English-only customer mail. Dashboard can stay Hinglish; the inbox should not.
- * Tone: a teammate, not a collections desk. Each decline gets a different story.
- */
 export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
   const first = inbox.name;
   const link = payUrl ?? "";
@@ -22,15 +18,12 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
       subject: "A quick heads-up: AutoPay took a nap",
       greeting: `Hi ${first},`,
       paragraphs: [
-        "You know how UPI AutoPay sometimes just… switches itself off? A bank app update, a fat thumb, a “just checking” screen. That just happened on your Eureka Labs AI/ML subscription.",
-        "We saw the pause. We did not try to pull the money again. Retrying a paused mandate is how you annoy a bank and a human at the same time. Also how you burn one of the few retries India even allows.",
-        "Your seat is still yours. Lectures, notebooks, the cohort: none of that got deleted. Access just waits on AutoPay the way a door waits on a key.",
-        "Thirty seconds on the link. Same UPI app. Same course. No new signup, no “welcome again” email, no starting over at module one.",
-        "If you meant to pause, totally fine. Ignore this. If you didn’t, the link is the whole fix.",
+        "UPI AutoPay paused itself on your Eureka Labs AI/ML subscription. We did not retry. That just annoys the bank.",
+        "Your seat is still yours. Thirty seconds on the link and the course stays open. If you meant to pause, ignore this.",
       ],
-      cta: link ? "Turn AutoPay back on" : "We’ll send the restart link in a moment.",
+      cta: link ? "Turn AutoPay back on" : "We will send the restart link in a moment.",
       signoff: "Mira, Eureka Labs",
-      ps: "Your account is completely fine. This is a heads-up, not a threat. We will not keep poking a dead mandate.",
+      ps: "Your account is fine. This is a heads-up, not a threat.",
     };
   }
 
@@ -39,15 +32,12 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
       subject: "Your card had a birthday. The payment did not.",
       greeting: `Hi ${first},`,
       paragraphs: [
-        "Banks love expiring cards on a Tuesday and telling nobody. The plastic in your wallet looks the same. The number on file at Eureka Labs just became a museum piece.",
-        "Your latest AI/ML course charge bounced for that reason. Not because you left. Not because we got creative with the amount. The card aged out.",
-        "We are not going to keep poking the old number. That never works. It just looks desperate, and it can make the next bank more suspicious, not less.",
-        "New card (or UPI). Same subscription. Same lectures waiting in the same place you left them. One tap, this month is paid, you go back to the module.",
-        "If you already updated it in your bank app, the link still helps. It just takes the new details and we’re done.",
+        "The card on your Eureka Labs subscription expired. We are not going to keep poking the old number.",
+        "New card (or UPI), same course. One tap and you are back in the lecture.",
       ],
-      cta: link ? "Update card and pay this month" : "We’ll send a fresh pay link in a moment.",
+      cta: link ? "Update card and pay this month" : "We will send a fresh pay link in a moment.",
       signoff: "Mira, Eureka Labs",
-      ps: "Nothing is cancelled. The course is waiting. The card just aged out.",
+      ps: "Nothing is cancelled. The card just aged out.",
     };
   }
 
@@ -56,15 +46,12 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
       subject: "You were this close. We saved your seat.",
       greeting: `Hi ${first},`,
       paragraphs: [
-        "You started checkout for Eureka Labs and then life happened. A call. A tab. A kettle. We have all been that person.",
-        "We did not silently debit you. That would be a jerk move. You pick the moment. We just kept the cart warm.",
-        "Same AI/ML cohort. Same price you already saw. No “offer expires in 3:00” countdown, no fake remaining seats, no guilt.",
-        "Whenever you have thirty seconds (tonight, tomorrow, after the meeting that should have been an email) the link finishes what you started.",
-        "If you changed your mind, that’s also fine. Close this. We won’t chase you around the internet.",
+        "You started Eureka Labs checkout and life happened. We did not silently debit you.",
+        "Same price, same cohort. The link finishes it whenever you have thirty seconds.",
       ],
-      cta: link ? "Finish checkout" : "We’ll send the checkout link in a moment.",
+      cta: link ? "Finish checkout" : "We will send the checkout link in a moment.",
       signoff: "Mira, Eureka Labs",
-      ps: "No countdown timers. No fake scarcity. Just the course you already wanted.",
+      ps: "No fake countdown. Just the course you already wanted.",
     };
   }
 
@@ -72,14 +59,12 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
     subject: "A quick heads-up on your Eureka Labs payment",
     greeting: `Hi ${first},`,
     paragraphs: [
-      "You know how banks sometimes get suspicious of perfectly normal charges, at perfectly normal times, for perfectly normal reasons? That just happened to you.",
-      "Your latest Eureka Labs AI/ML course charge didn’t go through. It’s almost certainly temporary. The kind of thing that sorts itself out once your bank finishes its afternoon nap.",
-      "We are not going to hammer the same debit every morning. That is how a small glitch becomes a blocked card and a bad mood.",
-      "If we need you, there will be one calm link. If we don’t, you won’t hear from us again about this.",
+      "Your latest Eureka Labs charge did not go through. Almost certainly temporary.",
+      "We will not hammer the same debit every morning. One calm link if we need you.",
     ],
-    cta: link ? "Take a look" : "We’ll follow up with a link if we need you.",
+    cta: link ? "Take a look" : "We will follow up with a link if we need you.",
     signoff: "Mira, Eureka Labs",
-    ps: "Your account is completely fine. This is a heads-up, not a threat.",
+    ps: "Your account is fine. This is a heads-up, not a threat.",
   };
 }
 
