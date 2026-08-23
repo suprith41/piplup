@@ -1,0 +1,128 @@
+import { grantAdaptive } from "../recovery/policy.ts";
+import { enrichWithReply } from "../recovery/reply.ts";
+import { seedBatch } from "../recovery/seed.ts";
+import { exposurePaise } from "../recovery/simulate.ts";
+import type { RecoveryCase } from "../recovery/types.ts";
+import { appendAudit, findLink, type AuditLine } from "./audit.ts";
+import { createPaymentLink, type CreatedLink } from "./client.ts";
+
+const LINK_MUTATIONS = new Set(["payment_link", "mandate_reauth"]);
+
+/** Three cases the video can click: expired card, paused mandate, checkout drop. */
+export const DEMO_CASE_IDS = ["rc_071", "rc_072", "rc_096"] as const;
+
+export function caseById(id: string): RecoveryCase | undefined {
+  return seedBatch().map(enrichWithReply).find((c) => c.id === id);
+}
+
+export async function executeRecovery(
+  caseId: string,
+  options: { injectTimeout?: boolean } = {},
+): Promise<AuditLine> {
+  const c = caseById(caseId);
+  if (!c) {
+    return appendAudit({
+      caseId,
+      mutation: "none",
+      granted: false,
+      reason: "Unknown case.",
+      outcome: "refused",
+      error: "case_not_found",
+    });
+  }
+
+  const decision = grantAdaptive(c);
+
+  if (!decision.allowed || !LINK_MUTATIONS.has(decision.mutation)) {
+    return appendAudit({
+      caseId,
+      mutation: decision.mutation,
+      granted: false,
+      reason: decision.stopReason ?? decision.reason,
+      outcome: "refused",
+      error: "policy_denied_or_not_a_link",
+    });
+  }
+
+  const existing = findLink(caseId);
+  if (existing) {
+    return appendAudit({
+      caseId,
+      mutation: decision.mutation,
+      granted: true,
+      reason: "Idempotent reuse. Same case does not mint a second link.",
+      outcome: "reused",
+      link: existing,
+    });
+  }
+
+  if (options.injectTimeout) {
+    return appendAudit({
+      caseId,
+      mutation: decision.mutation,
+      granted: true,
+      reason: "Injected Razorpay timeout. No link created, no double charge.",
+      outcome: "failed",
+      error: "injected_timeout",
+    });
+  }
+
+  try {
+    const link = await createPaymentLink({
+      amountPaise: exposurePaise(c),
+      referenceId: `plp_${caseId}_${decision.mutation}`.slice(0, 40),
+      description:
+        decision.mutation === "mandate_reauth"
+          ? `Piplup re-auth · ${c.customerName} · ${c.id}`
+          : `Piplup recovery · ${c.customerName} · ${c.id}`,
+      customerName: c.customerName,
+      notes: {
+        case_id: c.id,
+        mutation: decision.mutation,
+        decline: c.declineCode,
+        policy: "adaptive",
+      },
+    });
+
+    return appendAudit({
+      caseId,
+      mutation: decision.mutation,
+      granted: true,
+      reason: decision.reason,
+      outcome: "created",
+      link,
+    });
+  } catch (error) {
+    return appendAudit({
+      caseId,
+      mutation: decision.mutation,
+      granted: true,
+      reason: decision.reason,
+      outcome: "failed",
+      error: error instanceof Error ? error.message : "unknown_error",
+    });
+  }
+}
+
+export async function executeDemo(options: { injectTimeout?: boolean } = {}): Promise<AuditLine[]> {
+  const rows: AuditLine[] = [];
+  for (const id of DEMO_CASE_IDS) {
+    rows.push(await executeRecovery(id, options));
+  }
+  return rows;
+}
+
+export function describeDemoCases(): Array<{ id: string; name: string; decline: string; mutation: string }> {
+  return DEMO_CASE_IDS.map((id) => {
+    const c = caseById(id);
+    const decision = c ? grantAdaptive(c) : undefined;
+    return {
+      id,
+      name: c?.customerName ?? id,
+      decline: c?.declineCode ?? "",
+      mutation: decision?.mutation ?? "none",
+    };
+  });
+}
+
+export type { CreatedLink };

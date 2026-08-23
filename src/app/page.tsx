@@ -1,3 +1,4 @@
+import { RecoverLive } from "@/app/RecoverLive";
 import { hinglishNudge } from "@/lib/recovery/copy";
 import { evaluateBatch } from "@/lib/recovery/evaluate";
 import { replyIntentLabel } from "@/lib/recovery/reply";
@@ -83,6 +84,8 @@ export default function Page() {
         <ScoreColumn title="T+3 calendar" subtitle="Same debit, same rail, T+1 T+2 T+3" score={report.baseline} tone="rust" />
         <ScoreColumn title="Adaptive Recovery" subtitle="Two clocks · mutate · stop" score={report.adaptive} tone="moss" />
       </section>
+
+      <RecoverLive />
 
       <section className="mt-12">
         <div className="mb-4 flex items-end justify-between">

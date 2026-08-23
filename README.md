@@ -92,7 +92,13 @@ The parser is rule-based today; the LLM slice replaces the extraction, never the
 
 ## Env
 
-Copy `.env.example` to `.env.local`. Test-mode Razorpay keys are for the next slice (Payment Links). The scorecard runs without them.
+Copy `.env.example` to `.env.local` with **test-mode** keys (`rzp_test_…`). Live keys are refused.
+
+```bash
+npm run recover:demo
+```
+
+That mints three Test Mode Payment Links (expired card, paused mandate, checkout drop) after the policy grant. Test accounts allow 30 links total, so we never create one per batch row. Links also appear from the dashboard button on [http://localhost:3000](http://localhost:3000). Check them under Payment Links in the Razorpay dashboard.
 
 ## Docs
 

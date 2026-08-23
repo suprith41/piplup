@@ -3,5 +3,6 @@ node_modules
 out
 .env
 .env.local
+data/
 .DS_Store
 *.log
