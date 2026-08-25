@@ -6,8 +6,14 @@ const NAMES = [
   "Kunal", "Sneha", "Yash", "Isha",
 ];
 
+const SURNAMES = [
+  "Mehta", "Iyer", "Reddy", "Kapoor", "Nair", "Shah", "Banerjee", "Kulkarni",
+  "Das", "Menon", "Joshi", "Patel", "Rao", "Khanna", "Bose", "Malhotra",
+  "Pillai", "Desai", "Ahuja", "Ghosh",
+];
+
 function name(i: number): string {
-  return NAMES[i % NAMES.length];
+  return `${NAMES[i % NAMES.length]} ${SURNAMES[Math.floor(i / NAMES.length) % SURNAMES.length]}`;
 }
 
 function amount(i: number): number {

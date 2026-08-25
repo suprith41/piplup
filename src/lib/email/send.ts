@@ -48,7 +48,7 @@ export async function sendReminders(
 
   const mail = transporter();
   const from = mailStatus().from;
-  const results: Array<{ email: string; name: string; ok: boolean; error?: string }> = [];
+  const results: Array<{ email: string; name: string; ok: boolean; error?: string; sent?: number; left?: number }> = [];
 
   for (const inbox of targets) {
     const used = sentCount(inbox.email);

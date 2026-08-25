@@ -3,18 +3,56 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 html {
-  background: #f4f1ea;
+  background: #07090d;
 }
 
 body {
   min-height: 100vh;
-  color: #0b1220;
+  color: #e8e4d9;
 }
 
 .mono {
   font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+@keyframes desk-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes desk-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.desk-pulse {
+  animation: desk-pulse 1.4s ease-in-out infinite;
+}
+
+.desk-in {
+  animation: desk-in 0.28s ease-out;
+}
+
+.desk-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.desk-scroll::-webkit-scrollbar-thumb {
+  background: rgba(232, 228, 217, 0.12);
+  border-radius: 99px;
 }
