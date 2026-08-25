@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { DeskEvent, IngressEvent, QueueItem } from "@/lib/autopilot/types";
+import { DEMO_INBOXES } from "@/lib/email/recipients";
 import { EUREKA } from "@/lib/merchant/eureka";
 import { formatINR } from "@/lib/recovery/taxonomy";
 
@@ -25,8 +26,6 @@ type Boot = {
   queue: QueueItem[];
 };
 
-const NOTIFY_KEY = "piplup.eureka.notified";
-
 export function Desk() {
   const [boot, setBoot] = useState<Boot | null>(null);
   const [tab, setTab] = useState<Tab>("desk");
@@ -41,6 +40,8 @@ export function Desk() {
   const [tape, setTape] = useState("Razorpay has not posted tonight yet.");
   const [clock, setClock] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [mailing, setMailing] = useState(false);
+  const [mailNote, setMailNote] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const started = useRef(false);
 
@@ -68,12 +69,11 @@ export function Desk() {
 
   useEffect(() => {
     if (!boot) return;
-    const notify = !sessionStorage.getItem(NOTIFY_KEY);
     // Delay so React Strict Mode's fake unmount does not start two nights.
     const timer = window.setTimeout(() => {
       if (started.current) return;
       started.current = true;
-      void runNight(notify);
+      void runNight();
     }, 80);
     return () => window.clearTimeout(timer);
     // runNight is stable enough: it only uses setState and refs.
@@ -124,7 +124,7 @@ export function Desk() {
     }
   }
 
-  async function runNight(notify: boolean) {
+  async function runNight() {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
@@ -138,10 +138,9 @@ export function Desk() {
     setById({});
     setHotId(null);
     setTape("Listening for Razorpay. Failures will land on this desk.");
-    if (notify) sessionStorage.setItem(NOTIFY_KEY, "1");
 
     try {
-      const res = await fetch(`/api/desk/stream?live=1&notify=${notify ? "1" : "0"}`, {
+      const res = await fetch("/api/desk/stream?live=1", {
         signal: controller.signal,
         headers: { Accept: "text/event-stream" },
       });
@@ -176,6 +175,49 @@ export function Desk() {
     abort.current = null;
     setRunning(false);
     setTape("Mira paused the night. Queue is frozen where it is.");
+  }
+
+  async function sendEmails() {
+    setMailing(true);
+    setMailNote(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/remind", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emails: DEMO_INBOXES.map((row) => row.email) }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        results?: Array<{ email: string; name: string; ok: boolean; error?: string }>;
+      };
+      if (!res.ok) throw new Error(data.error ?? "send failed");
+      const results = data.results ?? [];
+      const failed = results.filter((row) => !row.ok);
+      setMailNote(
+        failed.length === 0
+          ? "Mailed Arjun, Nisha, and Riya once."
+          : failed.map((row) => `${row.name}: ${row.error ?? "failed"}`).join(" · "),
+      );
+      setById((prev) => {
+        const next = { ...prev };
+        for (const inbox of DEMO_INBOXES) {
+          const result = results.find((row) => row.email === inbox.email);
+          const existing = next[inbox.caseId];
+          if (!existing || !result) continue;
+          next[inbox.caseId] = {
+            ...existing,
+            emailed: result.ok,
+            emailError: result.ok ? undefined : result.error,
+          };
+        }
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "send failed");
+    } finally {
+      setMailing(false);
+    }
   }
 
   const recoveredPaise = useMemo(
@@ -219,13 +261,21 @@ export function Desk() {
               disabled={!boot}
               onClick={() => {
                 started.current = true;
-                void runNight(false);
+                void runNight();
               }}
-              className="rounded bg-[#e8e4d9] px-4 py-1.5 text-xs font-medium text-[#07090d] disabled:opacity-40"
+              className="rounded border border-white/15 px-3 py-1.5 text-xs disabled:opacity-40"
             >
               Replay tonight
             </button>
           )}
+          <button
+            type="button"
+            disabled={!boot?.mail.configured || mailing}
+            onClick={() => void sendEmails()}
+            className="rounded bg-[#e8e4d9] px-4 py-1.5 text-xs font-medium text-[#07090d] disabled:opacity-40"
+          >
+            {mailing ? "Sending…" : "Send emails"}
+          </button>
         </div>
       </header>
 
@@ -266,6 +316,7 @@ export function Desk() {
               feed={feed}
               mix={mix}
               queue={boot?.queue ?? []}
+              mailNote={mailNote}
             />
           ) : null}
           {tab === "students" ? <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} /> : null}
@@ -320,6 +371,7 @@ function DeskFloor(props: {
   feed: DeskEvent[];
   mix: { key: string; n: number }[];
   queue: QueueItem[];
+  mailNote: string | null;
 }) {
   const {
     boot,
@@ -339,6 +391,7 @@ function DeskFloor(props: {
     feed,
     mix,
     queue,
+    mailNote,
   } = props;
 
   return (
@@ -377,6 +430,7 @@ function DeskFloor(props: {
           <LiveCard key={row.id} row={row} event={byId[row.id]} hot={hotId === row.id} mail={boot?.mail.configured ?? false} />
         ))}
       </section>
+      {mailNote ? <p className="text-sm text-[#3dba7a]">{mailNote}</p> : null}
 
       <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
         <Tape
@@ -480,6 +534,9 @@ function LiveCard({
       </p>
       {event?.emailed ? <p className="mt-2 text-xs text-[#3dba7a]">Mira mailed them from Eureka Labs.</p> : null}
       {event?.emailError ? <p className="mt-2 text-xs text-[#e06a4c]">{event.emailError}</p> : null}
+      {mail && !event?.emailed ? (
+        <p className="mt-2 text-xs text-white/35">Link can mint on its own. Mail only goes when you hit Send emails.</p>
+      ) : null}
       {!mail ? <p className="mt-2 text-xs text-white/35">SMTP off. Link still mints in test mode.</p> : null}
       {event?.linkUrl ? (
         <a className="mt-3 inline-block text-xs text-[#3dba7a] underline" href={event.linkUrl} target="_blank" rel="noreferrer">

@@ -18,7 +18,6 @@ function pace(index: number): number {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const live = url.searchParams.get("live") !== "0";
-  const notify = url.searchParams.get("notify") === "1";
   const encoder = new TextEncoder();
   const queue = nightQueue();
 
@@ -44,7 +43,7 @@ export async function GET(request: Request) {
           send(ingressFor(c));
           await sleep(pace(i));
           if (request.signal.aborted) break;
-          const event = await actOnCase(c.id, live, { notify });
+          const event = await actOnCase(c.id, live, { notify: false });
           send({ type: "decision", event, index: i + 1, total: queue.length });
         }
 

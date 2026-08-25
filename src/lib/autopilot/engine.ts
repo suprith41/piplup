@@ -68,7 +68,7 @@ export async function actOnCase(
   const score = runPolicy([c], "adaptive");
   const attempt = score.attempts[0];
   const isLiveTarget = live && LIVE.has(caseId);
-  const shouldNotify = options.notify !== false;
+  const shouldNotify = options.notify === true;
 
   let linkUrl: string | undefined;
   let emailed = false;

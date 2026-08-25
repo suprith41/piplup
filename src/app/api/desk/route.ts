@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "caseId required" }, { status: 400 });
   }
   try {
-    const event = await actOnCase(body.caseId, body.live !== false, { notify: body.notify });
+    const event = await actOnCase(body.caseId, body.live !== false, { notify: body.notify === true });
     return Response.json({ event });
   } catch (error) {
     return Response.json(
