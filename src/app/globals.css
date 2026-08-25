@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html {
-  background: #07090d;
+  background: #f7f7f5;
 }
 
 body {
   min-height: 100vh;
-  color: #e8e4d9;
+  color: #171717;
 }
 
 .mono {
@@ -32,7 +32,7 @@ body {
 @keyframes desk-in {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -45,7 +45,7 @@ body {
 }
 
 .desk-in {
-  animation: desk-in 0.28s ease-out;
+  animation: desk-in 0.22s ease-out;
 }
 
 .desk-scroll::-webkit-scrollbar {
@@ -53,6 +53,6 @@ body {
 }
 
 .desk-scroll::-webkit-scrollbar-thumb {
-  background: rgba(232, 228, 217, 0.12);
+  background: #d4d4d0;
   border-radius: 99px;
 }

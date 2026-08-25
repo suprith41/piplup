@@ -69,14 +69,12 @@ export function Desk() {
 
   useEffect(() => {
     if (!boot) return;
-    // Delay so React Strict Mode's fake unmount does not start two nights.
     const timer = window.setTimeout(() => {
       if (started.current) return;
       started.current = true;
       void runNight();
     }, 80);
     return () => window.clearTimeout(timer);
-    // runNight is stable enough: it only uses setState and refs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boot]);
 
@@ -231,125 +229,118 @@ export function Desk() {
   const mix = mixCounts(boot?.queue ?? [], byId);
 
   return (
-    <div className="min-h-screen bg-[#07090d] text-[#e8e4d9]">
-      <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-5 py-4 lg:px-8">
-        <div>
-          <p className="mono text-[10px] uppercase tracking-[0.28em] text-white/35">
-            {EUREKA.city} · {EUREKA.product}
-          </p>
-          <h1 className="mt-1 text-xl font-semibold tracking-tight">{EUREKA.name}</h1>
-          <p className="mt-0.5 text-xs text-white/45">
-            {EUREKA.cohort} · {EUREKA.cycle} · {EUREKA.operator}, {EUREKA.operatorRole}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-5">
-          <div className="text-right">
-            <p className="mono text-lg tabular-nums text-white/80">{clock || "—"}</p>
-            <p className="mono text-[10px] uppercase tracking-[0.2em] text-white/35">IST · billing night</p>
+    <div className="min-h-screen bg-[#f7f7f5] text-neutral-900">
+      <header className="border-b border-neutral-200 bg-white">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+          <div className="flex flex-wrap items-center gap-8">
+            <div>
+              <p className="text-[11px] text-neutral-400">{EUREKA.city}</p>
+              <h1 className="text-lg font-semibold tracking-tight">{EUREKA.name}</h1>
+            </div>
+            <nav className="flex gap-1 text-sm">
+              <NavBtn active={tab === "desk"} onClick={() => setTab("desk")}>
+                Desk
+              </NavBtn>
+              <NavBtn active={tab === "students"} onClick={() => setTab("students")}>
+                Students
+              </NavBtn>
+              <NavBtn active={tab === "halted"} onClick={() => setTab("halted")}>
+                Stopped{stopped ? ` ${stopped}` : ""}
+              </NavBtn>
+            </nav>
           </div>
-          <span className={`mono text-[11px] uppercase tracking-wider ${running ? "text-[#3dba7a]" : done ? "text-white/40" : "text-white/35"}`}>
-            <span className={running ? "desk-pulse" : ""}>{running ? "●" : done ? "○" : "○"}</span>{" "}
-            {running ? "Piplup live" : done ? "night closed" : "idle"}
-          </span>
-          {running ? (
-            <button type="button" className="rounded border border-white/15 px-3 py-1.5 text-xs" onClick={stopNight}>
-              Pause
-            </button>
-          ) : (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="mono text-xs tabular-nums text-neutral-400">
+              {clock || "—"} IST
+            </p>
+            <span className={`text-xs ${running ? "text-emerald-700" : "text-neutral-400"}`}>
+              <span className={running ? "desk-pulse" : ""}>{running ? "●" : "○"}</span>{" "}
+              {running ? "Live" : done ? "Closed" : "Idle"}
+            </span>
+            {running ? (
+              <button type="button" className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm" onClick={stopNight}>
+                Pause
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!boot}
+                onClick={() => {
+                  started.current = true;
+                  void runNight();
+                }}
+                className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm disabled:opacity-40"
+              >
+                Replay
+              </button>
+            )}
             <button
               type="button"
-              disabled={!boot}
-              onClick={() => {
-                started.current = true;
-                void runNight();
-              }}
-              className="rounded border border-white/15 px-3 py-1.5 text-xs disabled:opacity-40"
+              disabled={!boot?.mail.configured || mailing}
+              onClick={() => void sendEmails()}
+              className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-40"
             >
-              Replay tonight
+              {mailing ? "Sending…" : "Send emails"}
             </button>
-          )}
-          <button
-            type="button"
-            disabled={!boot?.mail.configured || mailing}
-            onClick={() => void sendEmails()}
-            className="rounded bg-[#e8e4d9] px-4 py-1.5 text-xs font-medium text-[#07090d] disabled:opacity-40"
-          >
-            {mailing ? "Sending…" : "Send emails"}
-          </button>
+          </div>
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-73px)] lg:grid-cols-[200px_1fr]">
-        <aside className="border-b border-white/10 px-3 py-5 lg:border-b-0 lg:border-r">
-          <Nav tab={tab} onChange={setTab} halted={stopped} />
-          <div className="mt-10 px-3">
-            <p className="mono text-[10px] uppercase tracking-[0.22em] text-white/30">Powered by</p>
-            <p className="mt-1 text-lg font-medium">Piplup</p>
-            <p className="mt-1 text-[11px] leading-5 text-white/40">
-              Types the fail. Grants in code. Mutates the attempt. The model never moves money.
-            </p>
-            <p className="mt-4">
-              <Link className="mono text-[11px] text-white/35 underline" href="/lab">
-                Internal lab
-              </Link>
-            </p>
-          </div>
-        </aside>
+      <main className="mx-auto max-w-6xl px-6 py-8">
+        <p className="text-sm text-neutral-500">
+          {EUREKA.cohort} · {EUREKA.cycle} · {EUREKA.operator} · Powered by Piplup
+          <Link className="ml-3 text-neutral-400 underline decoration-neutral-300" href="/lab">
+            Lab
+          </Link>
+        </p>
 
-        <main className="px-5 py-6 lg:px-8">
-          {tab === "desk" ? (
-            <DeskFloor
-              boot={boot}
-              tape={tape}
-              running={running}
-              done={done}
-              cursor={cursor}
-              total={total || boot?.queue.length || 0}
-              recoveredPaise={recoveredPaise}
-              recovered={recovered}
-              stopped={stopped}
-              liveHits={liveHits}
-              liveStudents={liveStudents}
-              byId={byId}
-              hotId={hotId}
-              ingress={ingress}
-              feed={feed}
-              mix={mix}
-              queue={boot?.queue ?? []}
-              mailNote={mailNote}
-            />
-          ) : null}
-          {tab === "students" ? <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} /> : null}
-          {tab === "halted" ? <HaltedList feed={feed.filter((e) => e.stopped)} /> : null}
-          {error ? <p className="mt-4 text-sm text-[#e06a4c]">{error}</p> : null}
-        </main>
-      </div>
+        {tab === "desk" ? (
+          <DeskFloor
+            boot={boot}
+            tape={tape}
+            running={running}
+            done={done}
+            cursor={cursor}
+            total={total || boot?.queue.length || 0}
+            recoveredPaise={recoveredPaise}
+            recovered={recovered}
+            stopped={stopped}
+            liveHits={liveHits}
+            liveStudents={liveStudents}
+            byId={byId}
+            hotId={hotId}
+            ingress={ingress}
+            feed={feed}
+            mix={mix}
+            queue={boot?.queue ?? []}
+            mailNote={mailNote}
+          />
+        ) : null}
+        {tab === "students" ? <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} /> : null}
+        {tab === "halted" ? <HaltedList feed={feed.filter((e) => e.stopped)} /> : null}
+        {error ? <p className="mt-4 text-sm text-orange-700">{error}</p> : null}
+      </main>
     </div>
   );
 }
 
-function Nav({ tab, onChange, halted }: { tab: Tab; onChange: (t: Tab) => void; halted: number }) {
-  const items: { id: Tab; label: string; hint?: string }[] = [
-    { id: "desk", label: "Revenue desk" },
-    { id: "students", label: "Students" },
-    { id: "halted", label: "Stopped", hint: halted ? String(halted) : undefined },
-  ];
+function NavBtn({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
   return (
-    <nav className="space-y-1 text-sm">
-      {items.map((item) => (
-        <button
-          key={item.id}
-          type="button"
-          onClick={() => onChange(item.id)}
-          className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left ${
-            tab === item.id ? "bg-white/10 text-[#e8e4d9]" : "text-white/40 hover:text-white/70"
-          }`}
-        >
-          {item.label}
-          {item.hint ? <span className="mono text-[10px] text-white/40">{item.hint}</span> : null}
-        </button>
-      ))}
-    </nav>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md px-3 py-1.5 ${active ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-800"}`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -395,107 +386,86 @@ function DeskFloor(props: {
   } = props;
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-2xl border border-white/10 bg-[#10141c] px-5 py-5">
-        <p className="mono text-[10px] uppercase tracking-[0.22em] text-white/35">Tonight on the wire</p>
-        <p key={tape} className="desk-in mt-2 max-w-3xl text-xl font-medium leading-8 tracking-tight sm:text-2xl">
+    <div className="mt-8 space-y-8">
+      <section>
+        <p key={tape} className="desk-in max-w-2xl text-2xl font-medium leading-8 tracking-tight">
           {tape}
         </p>
-        <p className="mt-3 mono text-[11px] text-white/35">
+        <p className="mt-2 text-sm text-neutral-500">
           {running
-            ? `${cursor} of ${total} handled. Nobody at Eureka Labs is clicking.`
+            ? `${cursor} of ${total} handled.`
             : done
-              ? `Closed. Piplup recovered ${formatINR(recoveredPaise)} that T+3 would have left on the table or hammered.`
-              : "Autopilot starts the moment this desk loads."}
+              ? `Night closed. Recovered ${formatINR(recoveredPaise)} vs T+3.`
+              : "Autopilot starts when this page loads."}
         </p>
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Kpi label="Recovered tonight" value={formatINR(recoveredPaise)} hint={`${recovered} students back on the course`} />
-        <Kpi label="At risk this cycle" value={boot?.kpis.atRisk ?? "—"} hint={`${boot?.kpis.cases ?? 0} September seats`} />
-        <Kpi
-          label="Vs calendar T+3"
-          value={boot?.kpis.lift ?? "—"}
-          hint={`T+3 keeps ${boot?.kpis.t3 ?? "—"}. Piplup forecast ${boot?.kpis.recovered ?? "—"}`}
-        />
-        <Kpi
-          label="Left alone"
-          value={String(stopped)}
-          hint={`${boot?.kpis.slotsSaved ?? "—"} NPCI slots saved vs retrying everyone`}
-        />
+      <section className="grid gap-px overflow-hidden rounded-xl border border-neutral-200 bg-neutral-200 sm:grid-cols-2 xl:grid-cols-4">
+        <Kpi label="Recovered tonight" value={formatINR(recoveredPaise)} hint={`${recovered} students`} />
+        <Kpi label="At risk" value={boot?.kpis.atRisk ?? "—"} hint={`${boot?.kpis.cases ?? 0} seats`} />
+        <Kpi label="Lift vs T+3" value={boot?.kpis.lift ?? "—"} hint={`T+3 keeps ${boot?.kpis.t3 ?? "—"}`} />
+        <Kpi label="Left alone" value={String(stopped)} hint={`${boot?.kpis.slotsSaved ?? "—"} slots saved`} />
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3">
         {liveStudents.map((row) => (
           <LiveCard key={row.id} row={row} event={byId[row.id]} hot={hotId === row.id} mail={boot?.mail.configured ?? false} />
         ))}
       </section>
-      {mailNote ? <p className="text-sm text-[#3dba7a]">{mailNote}</p> : null}
+      {mailNote ? <p className="text-sm text-emerald-700">{mailNote}</p> : null}
 
-      <section className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <Tape
-          title="Incoming"
-          caption="Razorpay webhooks"
-          empty="Waiting for the first failed AutoPay."
-        >
+      <section className="grid gap-4 xl:grid-cols-2">
+        <Tape title="Incoming" caption="Razorpay" empty="Waiting for the first failed AutoPay.">
           {ingress.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="border-b border-white/5 px-4 py-3">
-              <p className="mono text-[10px] uppercase tracking-wider text-white/35">
+            <li key={`${row.caseId}-${row.at}`} className="border-t border-neutral-100 px-4 py-3 first:border-t-0">
+              <p className="text-xs text-neutral-400">
                 {row.source}
                 {row.live ? " · live" : ""}
               </p>
-              <p className="mt-1 text-sm">
+              <p className="mt-0.5 text-sm">
                 {row.name}{" "}
-                <span className="text-white/40">
+                <span className="text-neutral-400">
                   {row.amount} · {row.decline.replaceAll("_", " ")}
                 </span>
               </p>
-              <p className="mt-0.5 text-xs text-white/40">{row.course}</p>
             </li>
           ))}
         </Tape>
-        <Tape title="Piplup" caption="Grant · mutate · clock" empty="Decisions land here. The model does not mint links.">
+        <Tape title="Piplup" caption="Decisions" empty="Decisions land here.">
           {feed.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="border-b border-white/5 px-4 py-3">
+            <li key={`${row.caseId}-${row.at}`} className="border-t border-neutral-100 px-4 py-3 first:border-t-0">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm">
-                  {row.name}{" "}
-                  <span className="text-white/40">{row.amount}</span>
+                  {row.name} <span className="text-neutral-400">{row.amount}</span>
                 </p>
-                <p className={`mono text-[10px] uppercase tracking-wider ${tone(row)}`}>{badge(row)}</p>
+                <p className={`text-[11px] ${tone(row)}`}>{badge(row)}</p>
               </div>
-              <p className="mt-1 text-xs leading-5 text-white/55">{row.action}</p>
-              {row.inbound ? (
-                <p className="mt-1 text-xs italic text-white/40">Student: “{row.inbound}”</p>
-              ) : null}
+              <p className="mt-1 text-xs leading-5 text-neutral-500">{row.action}</p>
             </li>
           ))}
         </Tape>
       </section>
 
-      <section className="rounded-2xl border border-white/10 bg-[#10141c] p-5">
+      <section className="rounded-xl border border-neutral-200 bg-white p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="mono text-[10px] uppercase tracking-[0.22em] text-white/35">September cohort</p>
-            <h2 className="mt-1 text-base font-semibold">110 seats · one cell each</h2>
-          </div>
-          <p className="mono text-[11px] text-white/35">
-            {liveHits} live Razorpay {liveHits === 1 ? "hit" : "hits"} · {cursor}/{total} seen
+          <h2 className="text-sm font-medium">September cohort</h2>
+          <p className="text-xs text-neutral-400">
+            {liveHits} live {liveHits === 1 ? "hit" : "hits"} · {cursor}/{total}
           </p>
         </div>
-        <div className="mt-4 flex flex-wrap gap-1.5">
+        <div className="mt-4 flex flex-wrap gap-1">
           {queue.map((row) => (
             <span
               key={row.id}
               title={`${row.name} · ${row.decline}`}
-              className={`h-3.5 w-3.5 rounded-[3px] ${seatClass(seatFor(row.id, byId, hotId), row.live)}`}
+              className={`h-3 w-3 rounded-sm ${seatClass(seatFor(row.id, byId, hotId), row.live)}`}
             />
           ))}
         </div>
-        <div className="mt-5 flex flex-wrap gap-4">
+        <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
           {mix.map((row) => (
-            <p key={row.key} className="mono text-[11px] text-white/45">
-              <span className="text-white/70">{row.n}</span> {row.key}
+            <p key={row.key}>
+              <span className="text-neutral-800">{row.n}</span> {row.key}
             </p>
           ))}
         </div>
@@ -516,30 +486,27 @@ function LiveCard({
   mail: boolean;
 }) {
   return (
-    <article className={`rounded-2xl border p-4 ${hot ? "border-[#3dba7a]/60 bg-[#3dba7a]/5" : "border-white/10 bg-[#10141c]"}`}>
+    <article className={`rounded-xl border bg-white p-4 ${hot ? "border-emerald-400" : "border-neutral-200"}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="mono text-[10px] uppercase tracking-[0.18em] text-[#3dba7a]">Live student</p>
-          <h3 className="mt-1 text-lg font-semibold">{row.name}</h3>
-          <p className="text-xs text-white/45">
+          <p className="text-[11px] text-emerald-700">Live</p>
+          <h3 className="mt-0.5 text-base font-medium">{row.name}</h3>
+          <p className="text-xs text-neutral-400">
             {row.course} · {row.amount}
           </p>
         </div>
-        <p className={`mono text-[10px] uppercase ${event ? tone(event) : "text-white/35"}`}>
-          {hot ? "talking to razorpay" : event ? badge(event) : "queued"}
+        <p className={`text-[11px] ${event ? tone(event) : "text-neutral-400"}`}>
+          {hot ? "Razorpay" : event ? badge(event) : "queued"}
         </p>
       </div>
-      <p className="mt-3 text-sm leading-6 text-white/65">
-        {event?.action ?? `${row.decline.replaceAll("_", " ")} on ${row.rail.replaceAll("_", " ")}. Waiting for Piplup.`}
+      <p className="mt-3 text-sm leading-6 text-neutral-600">
+        {event?.action ?? `${row.decline.replaceAll("_", " ")}. Waiting.`}
       </p>
-      {event?.emailed ? <p className="mt-2 text-xs text-[#3dba7a]">Mira mailed them from Eureka Labs.</p> : null}
-      {event?.emailError ? <p className="mt-2 text-xs text-[#e06a4c]">{event.emailError}</p> : null}
-      {mail && !event?.emailed ? (
-        <p className="mt-2 text-xs text-white/35">Link can mint on its own. Mail only goes when you hit Send emails.</p>
-      ) : null}
-      {!mail ? <p className="mt-2 text-xs text-white/35">SMTP off. Link still mints in test mode.</p> : null}
+      {event?.emailed ? <p className="mt-2 text-xs text-emerald-700">Mailed from Eureka Labs.</p> : null}
+      {event?.emailError ? <p className="mt-2 text-xs text-orange-700">{event.emailError}</p> : null}
+      {mail && !event?.emailed ? <p className="mt-2 text-xs text-neutral-400">Mail only on Send emails.</p> : null}
       {event?.linkUrl ? (
-        <a className="mt-3 inline-block text-xs text-[#3dba7a] underline" href={event.linkUrl} target="_blank" rel="noreferrer">
+        <a className="mt-3 inline-block text-xs text-emerald-700 underline" href={event.linkUrl} target="_blank" rel="noreferrer">
           {event.linkUrl}
         </a>
       ) : null}
@@ -560,13 +527,13 @@ function Tape({
 }) {
   const emptyish = Array.isArray(children) && children.length === 0;
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#10141c]">
-      <div className="flex items-baseline justify-between border-b border-white/5 px-4 py-3">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <p className="mono text-[10px] uppercase tracking-[0.18em] text-white/35">{caption}</p>
+    <div className="rounded-xl border border-neutral-200 bg-white">
+      <div className="flex items-baseline justify-between px-4 py-3">
+        <h2 className="text-sm font-medium">{title}</h2>
+        <p className="text-[11px] text-neutral-400">{caption}</p>
       </div>
-      <ul className="desk-scroll max-h-[380px] overflow-y-auto">
-        {emptyish ? <li className="px-4 py-14 text-center text-sm text-white/35">{empty}</li> : children}
+      <ul className="desk-scroll max-h-[360px] overflow-y-auto border-t border-neutral-100">
+        {emptyish ? <li className="px-4 py-12 text-center text-sm text-neutral-400">{empty}</li> : children}
       </ul>
     </div>
   );
@@ -582,20 +549,19 @@ function StudentsTable({
   hotId: string | null;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#10141c]">
-      <div className="border-b border-white/5 px-5 py-4">
-        <h2 className="text-base font-semibold">September roster</h2>
-        <p className="mt-1 text-xs text-white/40">Statuses update as Piplup clears the night. No export button. This is the source.</p>
+    <div className="mt-8 overflow-hidden rounded-xl border border-neutral-200 bg-white">
+      <div className="px-5 py-4">
+        <h2 className="text-base font-medium">September roster</h2>
       </div>
       <div className="desk-scroll max-h-[70vh] overflow-auto">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 bg-[#10141c] mono text-[10px] uppercase tracking-[0.16em] text-white/35">
+          <thead className="sticky top-0 bg-white text-[11px] text-neutral-400">
             <tr>
-              <th className="px-5 py-3 font-normal">Student</th>
-              <th className="px-3 py-3 font-normal">Course</th>
-              <th className="px-3 py-3 font-normal">Fail</th>
-              <th className="px-3 py-3 font-normal">Piplup</th>
-              <th className="px-5 py-3 font-normal">Seat</th>
+              <th className="px-5 py-2 font-normal">Student</th>
+              <th className="px-3 py-2 font-normal">Course</th>
+              <th className="px-3 py-2 font-normal">Fail</th>
+              <th className="px-3 py-2 font-normal">Piplup</th>
+              <th className="px-5 py-2 font-normal">Seat</th>
             </tr>
           </thead>
           <tbody>
@@ -603,15 +569,15 @@ function StudentsTable({
               const event = byId[row.id];
               const hot = hotId === row.id;
               return (
-                <tr key={row.id} className="border-t border-white/5">
+                <tr key={row.id} className="border-t border-neutral-100">
                   <td className="px-5 py-2.5">
                     {row.name}
-                    {row.live ? <span className="ml-2 mono text-[10px] text-[#3dba7a]">LIVE</span> : null}
+                    {row.live ? <span className="ml-2 text-[10px] text-emerald-700">LIVE</span> : null}
                   </td>
-                  <td className="px-3 py-2.5 text-white/50">{row.course}</td>
-                  <td className="px-3 py-2.5 text-white/50">{row.decline.replaceAll("_", " ")}</td>
-                  <td className="px-3 py-2.5 text-white/55">{event?.action ?? (hot ? "on the wire" : "—")}</td>
-                  <td className={`px-5 py-2.5 mono text-[11px] uppercase ${event ? tone(event) : "text-white/30"}`}>
+                  <td className="px-3 py-2.5 text-neutral-500">{row.course}</td>
+                  <td className="px-3 py-2.5 text-neutral-500">{row.decline.replaceAll("_", " ")}</td>
+                  <td className="px-3 py-2.5 text-neutral-500">{event?.action ?? (hot ? "on the wire" : "—")}</td>
+                  <td className={`px-5 py-2.5 text-[11px] ${event ? tone(event) : "text-neutral-300"}`}>
                     {hot ? "hot" : event ? badge(event) : "waiting"}
                   </td>
                 </tr>
@@ -626,25 +592,24 @@ function StudentsTable({
 
 function HaltedList({ feed }: { feed: DeskEvent[] }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#10141c] p-5">
-      <h2 className="text-base font-semibold">Stopped on purpose</h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-white/50">
-        Revoked mandates, disputes, and stop-texting-me never get a retry. Calendar T+3 still hammers them. That is the
-        product.
+    <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-5">
+      <h2 className="text-base font-medium">Stopped on purpose</h2>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+        Revoked mandates, disputes, and stop-texting-me never get a retry. Calendar T+3 still hammers them.
       </p>
       {feed.length === 0 ? (
-        <p className="mt-10 text-sm text-white/35">Terminal cases will collect here as the night runs.</p>
+        <p className="mt-8 text-sm text-neutral-400">Terminal cases collect here as the night runs.</p>
       ) : (
-        <ul className="mt-6 divide-y divide-white/5">
+        <ul className="mt-6 divide-y divide-neutral-100">
           {feed.map((row) => (
             <li key={row.caseId} className="py-3">
               <p className="text-sm">
                 {row.name}{" "}
-                <span className="text-white/40">
+                <span className="text-neutral-400">
                   {row.amount} · {row.decline.replaceAll("_", " ")}
                 </span>
               </p>
-              <p className="mt-1 text-xs leading-5 text-white/50">{row.reason}</p>
+              <p className="mt-1 text-xs leading-5 text-neutral-500">{row.reason}</p>
             </li>
           ))}
         </ul>
@@ -655,10 +620,10 @@ function HaltedList({ feed }: { feed: DeskEvent[] }) {
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-[#10141c] p-4">
-      <p className="mono text-[10px] uppercase tracking-[0.18em] text-white/35">{label}</p>
+    <div className="bg-white p-4">
+      <p className="text-[11px] text-neutral-400">{label}</p>
       <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-white/40">{hint}</p>
+      <p className="mt-1 text-xs text-neutral-400">{hint}</p>
     </div>
   );
 }
@@ -672,9 +637,9 @@ function badge(e: DeskEvent): string {
 }
 
 function tone(e: DeskEvent): string {
-  if (e.stopped) return "text-white/40";
-  if (e.recovered) return "text-[#3dba7a]";
-  return "text-[#e06a4c]";
+  if (e.stopped) return "text-neutral-400";
+  if (e.recovered) return "text-emerald-700";
+  return "text-orange-700";
 }
 
 function seatFor(id: string, byId: Record<string, DeskEvent>, hotId: string | null): Seat {
@@ -687,12 +652,12 @@ function seatFor(id: string, byId: Record<string, DeskEvent>, hotId: string | nu
 }
 
 function seatClass(seat: Seat, live: boolean): string {
-  const ring = live ? "ring-1 ring-white/70" : "";
-  if (seat === "hot") return `bg-[#d4b483] desk-pulse ${ring}`;
-  if (seat === "recovered") return `bg-[#3dba7a] ${ring}`;
-  if (seat === "stopped") return `bg-white/20 ${ring}`;
-  if (seat === "parked") return `bg-[#c28a2b] ${ring}`;
-  return `bg-white/10 ${ring}`;
+  const ring = live ? "ring-1 ring-neutral-900" : "";
+  if (seat === "hot") return `bg-amber-400 desk-pulse ${ring}`;
+  if (seat === "recovered") return `bg-emerald-600 ${ring}`;
+  if (seat === "stopped") return `bg-neutral-300 ${ring}`;
+  if (seat === "parked") return `bg-amber-500 ${ring}`;
+  return `bg-neutral-200 ${ring}`;
 }
 
 function mixCounts(queue: QueueItem[], byId: Record<string, DeskEvent>): { key: string; n: number }[] {

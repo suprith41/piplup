@@ -114,7 +114,7 @@ export function RecoverLive() {
   }
 
   return (
-    <section className="mt-8 rounded-lg border border-ink/10 bg-white p-6">
+    <section className="mt-8 rounded-xl border border-neutral-200 bg-white p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="mono text-[11px] uppercase tracking-wider text-moss">Live · Razorpay Test Mode</p>
@@ -149,7 +149,7 @@ export function RecoverLive() {
           type="button"
           disabled={busy || !status?.configured}
           onClick={() => void run(false)}
-          className="rounded bg-ink px-4 py-2 text-sm text-paper disabled:opacity-40"
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
         >
           {busy ? "Calling Razorpay…" : "Create 3 test links"}
         </button>
@@ -205,7 +205,7 @@ export function RecoverLive() {
           type="button"
           disabled={mailBusy || !mailReady || picked.length === 0}
           onClick={() => void sendMail()}
-          className="mt-4 rounded bg-moss px-4 py-2 text-sm text-white disabled:opacity-40"
+          className="mt-4 rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
         >
           {mailBusy ? "Sending…" : `Send reminder (${picked.length})`}
         </button>

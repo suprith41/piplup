@@ -9,13 +9,13 @@ export default function LabPage() {
   const report = evaluateBatch();
 
   return (
-    <main className="min-h-screen bg-paper text-ink">
+    <main className="min-h-screen bg-[#f7f7f5] text-neutral-900">
       <div className="mx-auto max-w-5xl px-6 py-10">
-      <p className="mono text-xs uppercase tracking-[0.2em] text-ink/45">Internal · not the merchant desk</p>
-      <h1 className="mt-2 text-3xl font-semibold">Piplup lab</h1>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-ink/60">
-        Scorecard and manual Razorpay/mail controls. The product the reviewer should see is{" "}
-        <Link className="underline" href="/">
+      <p className="text-xs text-neutral-400">Internal</p>
+      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Piplup lab</h1>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+        Scorecard and manual Razorpay/mail controls. The product is the{" "}
+        <Link className="underline decoration-neutral-300" href="/">
           Eureka Labs revenue desk
         </Link>
         .
@@ -33,9 +33,9 @@ export default function LabPage() {
 
 function Stat({ k, v }: { k: string; v: string }) {
   return (
-    <div className="rounded-lg border border-ink/10 bg-white p-4">
-      <dt className="mono text-[10px] uppercase tracking-wider text-ink/40">{k}</dt>
-      <dd className="mt-1 text-xl font-semibold">{v}</dd>
+    <div className="rounded-xl border border-neutral-200 bg-white p-4">
+      <dt className="text-[11px] text-neutral-400">{k}</dt>
+      <dd className="mt-1 text-xl font-semibold tracking-tight">{v}</dd>
     </div>
   );
 }
