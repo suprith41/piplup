@@ -1,24 +1,24 @@
 import type { PolicyDecision, RecoveryCase } from "./types.ts";
 
-/** Hinglish customer copy. LLM can rewrite later; policy still owns the action. */
+/** English customer copy. LLM can rewrite later; policy still owns the action. */
 export function hinglishNudge(c: RecoveryCase, decision: PolicyDecision): string {
   if (decision.clock === "stop") {
-    return `${c.customerName} ji, Eureka Labs AutoPay pe retry nahi karenge. Pehle naya AutoPay set karna hoga, warna course access band ho jayega.`;
+    return `${c.customerName}, we will not retry Eureka Labs AutoPay. Set up a new AutoPay first, or course access will pause.`;
   }
   if (decision.mutation === "next_rail") {
     return "";
   }
   if (decision.mutation === "payment_link") {
-    return `${c.customerName}, Eureka Labs AI/ML course ki last payment fail ho gayi. 1-tap link se complete kar lo — subscription same rahegi.`;
+    return `${c.customerName}, your last Eureka Labs AI/ML course payment failed. Finish it with the 1-tap link — same subscription.`;
   }
   if (decision.mutation === "mandate_reauth") {
-    return `${c.customerName} ji, UPI AutoPay pause ho gaya hai. 30 second mein wapas on karo, warna Eureka Labs course hold pe chala jayega.`;
+    return `${c.customerName}, AutoPay is paused. Turn it back on in 30 seconds, or the Eureka Labs course goes on hold.`;
   }
   if (c.promiseToPayDay) {
-    return `${c.customerName}, samajh gaye — ${c.promiseToPayDay} tarikh ko salary ke baad Eureka Labs retry karenge. Usse pehle spam nahi karenge.`;
+    return `${c.customerName}, got it — we will retry Eureka Labs after salary on the ${c.promiseToPayDay}th. No spam before then.`;
   }
   if (c.salaryDay) {
-    return `${c.customerName}, balance short tha. ${c.salaryDay} tarikh ko course subscription ek baar try karenge.`;
+    return `${c.customerName}, the balance was short. We will try the course subscription once on the ${c.salaryDay}th.`;
   }
-  return `${c.customerName}, Eureka Labs payment fail hui. Hum smart retry schedule kar rahe hain — roz nahi kaatenge.`;
+  return `${c.customerName}, the Eureka Labs payment failed. We are scheduling a smart retry — we will not debit you every day.`;
 }

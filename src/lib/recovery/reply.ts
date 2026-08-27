@@ -3,13 +3,13 @@ import type { ParsedReply, RecoveryCase, ReplyIntent } from "./types.ts";
 const OPT_OUT = /\b(stop|band karo|mat bhejo|unsubscribe|cancel kar|nahi chahiye)\b/i;
 const ALREADY_PAID = /\b(kar diya|ho gaya|paid|payment done|de diya)\b/i;
 const DISPUTE = /\b(galat|wrong|dispute|maine nahi|charge kyu|refund)\b/i;
-const PROMISE = /\b(karunga|karungi|kar dunga|kar dungi|de dunga|de dungi|pay karunga|salary|tankha|baad me)\b/i;
+const PROMISE = /\b(karunga|karungi|kar dunga|kar dungi|de dunga|de dungi|pay karunga|i'?ll pay|will pay|salary|tankha|baad me)\b/i;
 
 const DAY = /\b([0-3]?\d)\s*(?:tarikh|tareek|th|st|nd|rd)?\b/;
 const MONTH_END = /\b(month end|mahine ke end|last week)\b/i;
 
 /**
- * Rule-based Hinglish reply parser.
+ * Rule-based English / Hinglish reply parser.
  *
  * Deliberately conservative: anything it is not sure about comes back as
  * "unclear" with low confidence so the policy engine ignores it. The LLM

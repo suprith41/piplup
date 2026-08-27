@@ -1,19 +1,30 @@
 import type { DeclineClass, Rail, RecoveryCase } from "./types.ts";
 
 const NAMES = [
-  "Aarav", "Diya", "Kabir", "Meera", "Ishaan", "Ananya", "Rohan", "Sara",
-  "Vihaan", "Kiara", "Arjun", "Nisha", "Dev", "Pooja", "Aditya", "Riya",
-  "Kunal", "Sneha", "Yash", "Isha",
-];
-
-const SURNAMES = [
-  "Mehta", "Iyer", "Reddy", "Kapoor", "Nair", "Shah", "Banerjee", "Kulkarni",
-  "Das", "Menon", "Joshi", "Patel", "Rao", "Khanna", "Bose", "Malhotra",
-  "Pillai", "Desai", "Ahuja", "Ghosh",
+  "Jensen Huang",
+  "James Walker",
+  "Mark Zuckerberg",
+  "Emma Clarke",
+  "Tim Cook",
+  "Oliver Bennett",
+  "Bill Gates",
+  "Demis Hassabis",
+  "Charlotte Hayes",
+  "Patrick Collison",
+  "Sam Altman",
+  "Elon Musk",
+  "Greg Brockman",
+  "Amelia Brooks",
+  "Jeff Bezos",
+  "Dario Amodei",
+  "Jony Ive",
+  "Andrej Karpathy",
+  "Henry Walsh",
+  "Lisa Su",
 ];
 
 function name(i: number): string {
-  return `${NAMES[i % NAMES.length]} ${SURNAMES[Math.floor(i / NAMES.length) % SURNAMES.length]}`;
+  return NAMES[i % NAMES.length];
 }
 
 function amount(i: number): number {
@@ -72,10 +83,10 @@ export function seedBatch(): RecoveryCase[] {
     c.salaryDay = 5;
     c.willSucceedOn.sameRailOnSalaryDay = true;
     if (i % 5 === 0) {
-      c.customerReply = "bhai abhi balance nahi hai, 5 tarikh ko salary aayegi tab kar dunga";
+      c.customerReply = "I'm short right now, salary lands on the 5th then I'll pay";
     }
     if (i % 7 === 0) {
-      c.customerReply = "month end me pay karunga";
+      c.customerReply = "I'll pay at month end";
     }
     if (i % 8 === 0) {
       c.liquidity = { instrumentSucceededElsewhere: true, atDay: 5 };
@@ -110,13 +121,13 @@ export function seedBatch(): RecoveryCase[] {
       c.declineCode = "insufficient_funds";
       c.chargeback = false;
       c.optedOut = false;
-      c.customerReply = "ye charge galat hai, maine subscribe hi nahi kiya";
+      c.customerReply = "this charge is wrong, I never subscribed";
     }
     if (i === 89) {
       c.declineCode = "insufficient_funds";
       c.chargeback = false;
       c.optedOut = false;
-      c.customerReply = "stop karo, mat bhejo ye messages";
+      c.customerReply = "stop, don't send these messages";
     }
     cases.push(c);
   }
@@ -140,7 +151,7 @@ export function seedBatch(): RecoveryCase[] {
     // One customer disputes the back-charge, so the sweeper must not force it.
     c.willSucceedOn.backCharge = i !== 104;
     if (i === 104) {
-      c.customerReply = "ye galat hai, maine to card update kar diya tha";
+      c.customerReply = "this is wrong, I already updated my card";
     }
     cases.push(c);
   }

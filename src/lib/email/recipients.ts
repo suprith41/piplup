@@ -1,19 +1,19 @@
 export const DEMO_INBOXES = [
   {
     caseId: "rc_071",
-    name: "Arjun",
+    name: "Sam",
     decline: "mandate_paused",
     email: "drstrangemcue616@gmail.com",
   },
   {
     caseId: "rc_072",
-    name: "Nisha",
+    name: "Elon",
     decline: "card_expired",
     email: "suprithbin@gmail.com",
   },
   {
     caseId: "rc_096",
-    name: "Riya",
+    name: "Dario",
     decline: "checkout_abandoned",
     email: "quanttrading819@gmail.com",
   },

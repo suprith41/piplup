@@ -22,7 +22,7 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
         "Your seat is still yours. Thirty seconds on the link and the course stays open. If you meant to pause, ignore this.",
       ],
       cta: link ? "Turn AutoPay back on" : "We will send the restart link in a moment.",
-      signoff: "Mira, Eureka Labs",
+      signoff: "Ada, Eureka Labs",
       ps: "Your account is fine. This is a heads-up, not a threat.",
     };
   }
@@ -36,7 +36,7 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
         "New card (or UPI), same course. One tap and you are back in the lecture.",
       ],
       cta: link ? "Update card and pay this month" : "We will send a fresh pay link in a moment.",
-      signoff: "Mira, Eureka Labs",
+      signoff: "Ada, Eureka Labs",
       ps: "Nothing is cancelled. The card just aged out.",
     };
   }
@@ -50,7 +50,7 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
         "Same price, same cohort. The link finishes it whenever you have thirty seconds.",
       ],
       cta: link ? "Finish checkout" : "We will send the checkout link in a moment.",
-      signoff: "Mira, Eureka Labs",
+      signoff: "Ada, Eureka Labs",
       ps: "No fake countdown. Just the course you already wanted.",
     };
   }
@@ -63,7 +63,7 @@ export function punchyMail(inbox: DemoInbox, payUrl?: string): PunchyMail {
       "We will not hammer the same debit every morning. One calm link if we need you.",
     ],
     cta: link ? "Take a look" : "We will follow up with a link if we need you.",
-    signoff: "Mira, Eureka Labs",
+    signoff: "Ada, Eureka Labs",
     ps: "Your account is fine. This is a heads-up, not a threat.",
   };
 }

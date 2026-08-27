@@ -3,7 +3,7 @@ export const EUREKA = {
   legal: "Eureka Labs Pvt. Ltd.",
   city: "Bengaluru",
   product: "Online AI/ML courses",
-  operator: "Mira",
+  operator: "Ada",
   operatorRole: "Head of Revenue",
   cohort: "September 2026",
   cycle: "Cycle 47",

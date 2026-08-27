@@ -172,7 +172,7 @@ export function Desk() {
     abort.current?.abort();
     abort.current = null;
     setRunning(false);
-    setTape("Mira paused the night. Queue is frozen where it is.");
+    setTape("Ada paused the night. Queue is frozen where it is.");
   }
 
   async function sendEmails() {
@@ -194,7 +194,7 @@ export function Desk() {
       const failed = results.filter((row) => !row.ok);
       setMailNote(
         failed.length === 0
-          ? "Mailed Arjun, Nisha, and Riya once."
+          ? "Mailed Sam, Elon, and Dario once."
           : failed.map((row) => `${row.name}: ${row.error ?? "failed"}`).join(" · "),
       );
       setById((prev) => {
