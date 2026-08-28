@@ -42,14 +42,14 @@ function resolveEndState(c: RecoveryCase, recovered: boolean): SubscriptionState
 function isInvoluntaryChurn(c: RecoveryCase, end: SubscriptionState): boolean {
   if (end !== "halted") return false;
   if (c.trueClass === "terminal" || c.trueClass === "uncollected") return false;
-  return !c.optedOut && !c.chargeback;
+  return !c.optedOut && !c.chargeback && !c.claimedPaid;
 }
 
 function simulateAdaptive(c: RecoveryCase): AttemptResult {
   const decision = grantAdaptive(c);
 
   if (!decision.allowed) {
-    const correctlyStopped = c.trueClass === "terminal" || c.optedOut || c.chargeback;
+    const correctlyStopped = c.trueClass === "terminal" || c.optedOut || c.chargeback || c.claimedPaid;
     return {
       decision,
       executed: false,
@@ -163,7 +163,7 @@ function score(policy: PolicyName, cases: RecoveryCase[], attempts: AttemptResul
     0,
   );
 
-  const shouldStop = cases.filter((c) => c.trueClass === "terminal" || c.optedOut || c.chargeback);
+  const shouldStop = cases.filter((c) => c.trueClass === "terminal" || c.optedOut || c.chargeback || c.claimedPaid);
   const correctlyStoppedPaise = shouldStop.reduce((sum, c) => {
     const attempt = attempts[cases.indexOf(c)];
     if (attempt && !attempt.executed) return sum + exposurePaise(c);

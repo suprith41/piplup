@@ -2,8 +2,10 @@ import { DEMO_INBOXES } from "../email/recipients.ts";
 import { mailStatus, sendReminders } from "../email/send.ts";
 import { eurekaCourse, railLabel } from "../merchant/eureka.ts";
 import { DEMO_CASE_IDS, executeRecovery } from "../razorpay/executor.ts";
+import { hinglishNudge } from "../recovery/copy.ts";
+import { isCasePaid, latestHeardVoice } from "../recovery/ledger.ts";
 import { grantAdaptive, nextRail } from "../recovery/policy.ts";
-import { enrichWithReply } from "../recovery/reply.ts";
+import { applyVoiceOverlay, enrichWithReply } from "../recovery/reply.ts";
 import { seedBatch } from "../recovery/seed.ts";
 import { exposurePaise, runPolicy } from "../recovery/simulate.ts";
 import { formatINR } from "../recovery/taxonomy.ts";
@@ -16,12 +18,17 @@ const LIVE = new Set<string>(DEMO_CASE_IDS);
 
 /** Demo students first so the reviewer sees real Razorpay + mail in the opening seconds. */
 export function nightQueue(): RecoveryCase[] {
-  const all = seedBatch().map(enrichWithReply);
+  const all = seedBatch().map(enrichWithReply).map(withVoiceOverlay);
   const head = DEMO_CASE_IDS.map((id) => all.find((row) => row.id === id)).filter(
     (row): row is RecoveryCase => Boolean(row),
   );
   const rest = all.filter((row) => !LIVE.has(row.id));
   return [...head, ...rest];
+}
+
+function withVoiceOverlay(c: RecoveryCase): RecoveryCase {
+  const voice = latestHeardVoice(c.id);
+  return voice?.transcript ? applyVoiceOverlay(c, voice.transcript) : c;
 }
 
 export function queuePreview(): QueueItem[] {
@@ -36,6 +43,9 @@ export function queuePreview(): QueueItem[] {
     course: eurekaCourse(c.id),
     live: LIVE.has(c.id),
     inbound: c.customerReply,
+    promiseToPayDay: c.promiseToPayDay,
+    claimedPaid: c.claimedPaid,
+    parsedIntent: c.parsedReply?.intent,
   }));
 }
 
@@ -74,7 +84,7 @@ export async function actOnCase(
   let emailed = false;
   let emailError: string | undefined;
 
-  if (isLiveTarget) {
+  if (isLiveTarget && decision.allowed) {
     const audit = await executeRecovery(caseId);
     linkUrl = audit.link?.shortUrl;
     const inbox = DEMO_INBOXES.find((row) => row.caseId === caseId);
@@ -85,8 +95,25 @@ export async function actOnCase(
     }
   }
 
+  const recovered = isLiveTarget ? isCasePaid(caseId) : attempt.recovered;
+
+  return deskEvent(c, decision, recovered, attempt.executed, {
+    live: isLiveTarget,
+    linkUrl,
+    emailed,
+    emailError,
+  });
+}
+
+export function deskEvent(
+  c: RecoveryCase,
+  decision: PolicyDecision,
+  recovered: boolean,
+  executed: boolean,
+  extra: Partial<DeskEvent> = {},
+): DeskEvent {
   return {
-    at: new Date().toISOString(),
+    at: extra.at ?? new Date().toISOString(),
     caseId: c.id,
     name: c.customerName,
     amount: formatINR(exposurePaise(c)),
@@ -97,16 +124,29 @@ export async function actOnCase(
     course: eurekaCourse(c.id),
     clock: decision.clock,
     mutation: decision.mutation,
-    action: actionLine(c, decision, attempt.recovered, attempt.executed),
-    recovered: attempt.recovered,
-    stopped: !attempt.executed,
+    action:
+      extra.live && recovered
+        ? "Payment Link paid. Case closed."
+        : actionLine(c, decision, recovered, executed),
+    recovered,
+    stopped: !executed,
     reason: decision.reason,
-    live: isLiveTarget,
+    live: extra.live ?? false,
     inbound: c.customerReply,
-    linkUrl,
-    emailed,
-    emailError,
+    linkUrl: extra.linkUrl,
+    emailed: extra.emailed,
+    emailError: extra.emailError,
+    promiseToPayDay: c.promiseToPayDay,
+    claimedPaid: c.claimedPaid,
+    scheduledDay: decision.scheduledDay,
+    parsedIntent: c.parsedReply?.intent,
   };
+}
+
+export function previewNudge(caseId: string): string {
+  const c = nightQueue().find((row) => row.id === caseId);
+  if (!c) return "";
+  return hinglishNudge(c, grantAdaptive(c));
 }
 
 function webhookSource(c: RecoveryCase): string {
@@ -128,10 +168,16 @@ function actionLine(
     case "next_rail":
       return `Cascaded ${railLabel(c.rail)} → ${railLabel(nextRail(c.rail))} in the same second.`;
     case "payment_link":
+      if (c.promiseToPayDay && !recovered) {
+        return `Held until day ${c.promiseToPayDay}. We will not chase before then.`;
+      }
       return recovered
         ? "Minted a one-tap Payment Link. Did not replay the dead debit."
         : "Payment Link queued.";
     case "mandate_reauth":
+      if (c.promiseToPayDay && !recovered) {
+        return `Held until day ${c.promiseToPayDay}. We will not chase before then.`;
+      }
       return "Asked the student to wake UPI AutoPay. Same mandate is dead.";
     case "back_charge_invoices":
       return "Swept invoices Razorpay left sitting after the subscription revived.";

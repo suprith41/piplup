@@ -9,6 +9,9 @@ export type QueueItem = {
   course: string;
   live: boolean;
   inbound?: string;
+  promiseToPayDay?: number;
+  claimedPaid?: boolean;
+  parsedIntent?: string;
 };
 
 export type IngressEvent = {
@@ -45,4 +48,8 @@ export type DeskEvent = {
   linkUrl?: string;
   emailed?: boolean;
   emailError?: string;
+  promiseToPayDay?: number;
+  claimedPaid?: boolean;
+  scheduledDay?: number;
+  parsedIntent?: string;
 };

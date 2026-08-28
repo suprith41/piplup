@@ -1,7 +1,7 @@
 export const EUREKA = {
   name: "Eureka Labs",
   legal: "Eureka Labs Pvt. Ltd.",
-  city: "Bengaluru",
+  city: "San Francisco",
   product: "Online AI/ML courses",
   operator: "Ada",
   operatorRole: "Head of Revenue",

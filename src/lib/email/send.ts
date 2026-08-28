@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { findLink } from "../razorpay/audit.ts";
+import { appendLedger } from "../recovery/ledger.ts";
 import { mailToHtml, mailToText, punchyMail } from "./copy.ts";
 import { MAX_SENDS_PER_INBOX, remaining, recordSend, sentCount } from "./quota.ts";
 import { allowedInboxes, DEMO_INBOXES, type DemoInbox } from "./recipients.ts";
@@ -59,6 +60,15 @@ export async function sendReminders(
         ok: false,
         error: `Cap reached (${MAX_SENDS_PER_INBOX} reminders).`,
       });
+      appendLedger({
+        kind: "mail",
+        caseId: inbox.caseId,
+        mutation: "none",
+        granted: false,
+        reason: `Cap reached (${MAX_SENDS_PER_INBOX} reminders).`,
+        outcome: "refused",
+        error: "quota",
+      });
       continue;
     }
 
@@ -77,6 +87,15 @@ export async function sendReminders(
         },
       });
       recordSend(inbox.email);
+      appendLedger({
+        kind: "mail",
+        caseId: inbox.caseId,
+        mutation: "payment_link",
+        granted: true,
+        reason: content.subject,
+        outcome: "mailed",
+        linkUrl: findLink(inbox.caseId)?.shortUrl,
+      });
       results.push({
         email: inbox.email,
         name: inbox.name,
@@ -85,11 +104,21 @@ export async function sendReminders(
         left: remaining(inbox.email),
       });
     } catch (error) {
+      const message = error instanceof Error ? error.message : "send failed";
+      appendLedger({
+        kind: "mail",
+        caseId: inbox.caseId,
+        mutation: "none",
+        granted: false,
+        reason: "Reminder failed.",
+        outcome: "failed",
+        error: message,
+      });
       results.push({
         email: inbox.email,
         name: inbox.name,
         ok: false,
-        error: error instanceof Error ? error.message : "send failed",
+        error: message,
       });
     }
   }

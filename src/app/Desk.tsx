@@ -7,7 +7,7 @@ import { DEMO_INBOXES } from "@/lib/email/recipients";
 import { EUREKA } from "@/lib/merchant/eureka";
 import { formatINR } from "@/lib/recovery/taxonomy";
 
-type Tab = "desk" | "students" | "halted";
+type Tab = "desk" | "students" | "promises" | "halted";
 type Seat = "pending" | "hot" | "recovered" | "parked" | "stopped";
 
 type Boot = {
@@ -50,6 +50,42 @@ export function Desk() {
       .then((r) => r.json())
       .then(setBoot);
   }, []);
+
+  useEffect(() => {
+    if (!boot) return;
+    let cancelled = false;
+
+    async function pullPaid() {
+      const res = await fetch("/api/ledger");
+      if (!res.ok || cancelled) return;
+      const data = (await res.json()) as { paidCaseIds?: string[] };
+      const paid = data.paidCaseIds ?? [];
+      if (paid.length === 0) return;
+      setById((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const id of paid) {
+          const existing = next[id];
+          if (!existing || existing.recovered) continue;
+          next[id] = {
+            ...existing,
+            recovered: true,
+            stopped: false,
+            action: "Payment Link paid. Case closed.",
+          };
+          changed = true;
+        }
+        return changed ? next : prev;
+      });
+    }
+
+    void pullPaid();
+    const id = window.setInterval(() => void pullPaid(), 4000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [boot]);
 
   useEffect(() => {
     const tick = () =>
@@ -244,6 +280,9 @@ export function Desk() {
               <NavBtn active={tab === "students"} onClick={() => setTab("students")}>
                 Students
               </NavBtn>
+              <NavBtn active={tab === "promises"} onClick={() => setTab("promises")}>
+                Promises
+              </NavBtn>
               <NavBtn active={tab === "halted"} onClick={() => setTab("halted")}>
                 Stopped{stopped ? ` ${stopped}` : ""}
               </NavBtn>
@@ -314,9 +353,16 @@ export function Desk() {
             mix={mix}
             queue={boot?.queue ?? []}
             mailNote={mailNote}
+            onVoice={(event) => {
+              setById((prev) => ({ ...prev, [event.caseId]: event }));
+              setFeed((prev) => [event, ...prev]);
+              setTape(`${event.name} · ${event.action}`);
+            }}
+            onVoiceNote={setTape}
           />
         ) : null}
         {tab === "students" ? <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} /> : null}
+        {tab === "promises" ? <PromisesBoard queue={boot?.queue ?? []} byId={byId} /> : null}
         {tab === "halted" ? <HaltedList feed={feed.filter((e) => e.stopped)} /> : null}
         {error ? <p className="mt-4 text-sm text-orange-700">{error}</p> : null}
       </main>
@@ -363,6 +409,8 @@ function DeskFloor(props: {
   mix: { key: string; n: number }[];
   queue: QueueItem[];
   mailNote: string | null;
+  onVoice: (event: DeskEvent) => void;
+  onVoiceNote: (note: string) => void;
 }) {
   const {
     boot,
@@ -383,6 +431,8 @@ function DeskFloor(props: {
     mix,
     queue,
     mailNote,
+    onVoice,
+    onVoiceNote,
   } = props;
 
   return (
@@ -409,7 +459,15 @@ function DeskFloor(props: {
 
       <section className="grid gap-4 lg:grid-cols-3">
         {liveStudents.map((row) => (
-          <LiveCard key={row.id} row={row} event={byId[row.id]} hot={hotId === row.id} mail={boot?.mail.configured ?? false} />
+          <LiveCard
+            key={row.id}
+            row={row}
+            event={byId[row.id]}
+            hot={hotId === row.id}
+            mail={boot?.mail.configured ?? false}
+            onVoice={onVoice}
+            onVoiceNote={onVoiceNote}
+          />
         ))}
       </section>
       {mailNote ? <p className="text-sm text-emerald-700">{mailNote}</p> : null}
@@ -479,11 +537,15 @@ function LiveCard({
   event,
   hot,
   mail,
+  onVoice,
+  onVoiceNote,
 }: {
   row: QueueItem;
   event?: DeskEvent;
   hot: boolean;
   mail: boolean;
+  onVoice: (event: DeskEvent) => void;
+  onVoiceNote: (note: string) => void;
 }) {
   return (
     <article className={`rounded-xl border bg-white p-4 ${hot ? "border-emerald-400" : "border-neutral-200"}`}>
@@ -510,6 +572,7 @@ function LiveCard({
           {event.linkUrl}
         </a>
       ) : null}
+      <CallButton caseId={row.id} name={row.name} onVoice={onVoice} onVoiceNote={onVoiceNote} />
     </article>
   );
 }
@@ -590,12 +653,246 @@ function StudentsTable({
   );
 }
 
+function PromisesBoard({ queue, byId }: { queue: QueueItem[]; byId: Record<string, DeskEvent> }) {
+  const rows = queue
+    .map((row) => {
+      const event = byId[row.id];
+      const status = promiseStatus(row, event);
+      if (!status) return null;
+      return {
+        row,
+        event,
+        status,
+        day: event?.promiseToPayDay ?? row.promiseToPayDay,
+        quote: event?.inbound ?? row.inbound,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
+
+  return (
+    <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-5">
+      <h2 className="text-base font-medium">Promise to pay</h2>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+        Inbound replies become a date, a freeze, or a broken promise. Policy waits. It does not guess.
+      </p>
+      {rows.length === 0 ? (
+        <p className="mt-8 text-sm text-neutral-400">Promises land here as the night runs, or after a live call.</p>
+      ) : (
+        <ul className="mt-6 divide-y divide-neutral-100">
+          {rows.map(({ row, event, status, day, quote }) => (
+            <li key={row.id} className="py-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm">
+                  {row.name} <span className="text-neutral-400">{row.amount}</span>
+                </p>
+                <p className="text-[11px] text-neutral-500">{status.replaceAll("_", " ")}</p>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-neutral-500">
+                {status === "claimed_paid"
+                  ? "Customer says already paid. Retries frozen."
+                  : status === "honored"
+                    ? `Paid after promising day ${day}.`
+                    : status === "broken"
+                      ? `Waited until day ${day}. Still open.`
+                      : `Parked until day ${day}.`}
+              </p>
+              {quote ? <p className="mt-1 text-xs italic text-neutral-400">“{quote}”</p> : null}
+              {event?.action ? <p className="mt-1 text-xs text-neutral-400">{event.action}</p> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function promiseStatus(row: QueueItem, event?: DeskEvent): "waiting" | "honored" | "broken" | "claimed_paid" | null {
+  const claimed = row.claimedPaid || event?.claimedPaid;
+  const day = event?.promiseToPayDay ?? row.promiseToPayDay;
+  const promised = Boolean(day) || row.parsedIntent === "promise_to_pay" || event?.parsedIntent === "promise_to_pay";
+  if (!claimed && !promised) return null;
+  if (claimed) return "claimed_paid";
+  if (event?.recovered) return "honored";
+  if (row.live && event && !event.stopped) return "waiting";
+  if (event && !event.recovered && !event.stopped) return "broken";
+  return promised ? "waiting" : null;
+}
+
+function CallButton({
+  caseId,
+  name,
+  onVoice,
+  onVoiceNote,
+}: {
+  caseId: string;
+  name: string;
+  onVoice: (event: DeskEvent) => void;
+  onVoiceNote: (note: string) => void;
+}) {
+  const [phase, setPhase] = useState<"idle" | "speaking" | "listening" | "busy">("idle");
+  const [note, setNote] = useState<string | null>(null);
+
+  function recognitionCtor() {
+    return typeof window !== "undefined" ? window.SpeechRecognition || window.webkitSpeechRecognition : undefined;
+  }
+
+  async function submitTranscript(transcript: string) {
+    const res = await fetch("/api/voice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ caseId, transcript }),
+    });
+    const data = (await res.json()) as {
+      ignored?: boolean;
+      event?: DeskEvent | null;
+      parsed?: { intent: string };
+      error?: string;
+    };
+    if (!res.ok) throw new Error(data.error ?? "voice failed");
+    if (data.ignored || !data.event) {
+      setNote(`Heard “${transcript}” — too unclear to act.`);
+      return;
+    }
+    onVoice(data.event);
+    setNote(`Heard “${transcript}” → ${data.parsed?.intent.replaceAll("_", " ")}`);
+  }
+
+  async function listenAndSubmit() {
+    const Ctor = recognitionCtor();
+    if (!Ctor) {
+      setNote("Speech recognition needs Chrome or Edge.");
+      return;
+    }
+    setPhase("listening");
+    onVoiceNote(`Listening to ${name}…`);
+    const transcript = await listenOnce(Ctor);
+    if (!transcript) {
+      setNote("Didn't catch that. Tap Reply and speak.");
+      setPhase("idle");
+      return;
+    }
+    setPhase("busy");
+    await submitTranscript(transcript);
+    setPhase("idle");
+  }
+
+  async function call() {
+    if (!window.speechSynthesis) {
+      setNote("This browser has no speech synthesis. Use Chrome or Edge.");
+      return;
+    }
+
+    setPhase("busy");
+    setNote(null);
+    try {
+      const preview = await fetch(`/api/voice?caseId=${caseId}`).then((r) => r.json() as Promise<{ spoken?: string; error?: string }>);
+      const line = preview.spoken ?? "";
+      if (!line) {
+        setNote(preview.error ?? "Nothing to say.");
+        setPhase("idle");
+        return;
+      }
+
+      setPhase("speaking");
+      onVoiceNote(`Ada calling ${name}…`);
+      await speakHinglish(line);
+      await listenAndSubmit();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "voice failed");
+      setPhase("idle");
+    }
+  }
+
+  const label = phase === "speaking" ? "Speaking…" : phase === "listening" ? "Listening…" : phase === "busy" ? "Calling…" : "Call";
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        disabled={phase !== "idle"}
+        onClick={() => void call()}
+        className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs disabled:opacity-40"
+      >
+        {label}
+      </button>
+      <button
+        type="button"
+        disabled={phase !== "idle"}
+        onClick={() => void listenAndSubmit().catch((err) => setNote(err instanceof Error ? err.message : "voice failed"))}
+        className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs disabled:opacity-40"
+      >
+        Reply
+      </button>
+      {note ? <p className="basis-full text-xs text-neutral-500">{note}</p> : null}
+    </div>
+  );
+}
+
+function speakHinglish(text: string): Promise<void> {
+  return new Promise((resolve) => {
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "hi-IN";
+    const hindi = window.speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("hi"));
+    if (hindi) utterance.voice = hindi;
+    utterance.onend = () => resolve();
+    utterance.onerror = () => resolve();
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+function listenOnce(Ctor: SpeechRecognitionConstructor): Promise<string> {
+  return new Promise((resolve) => {
+    const rec = new Ctor();
+    rec.lang = "hi-IN";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    let settled = false;
+    const finish = (text: string) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      try {
+        rec.stop();
+      } catch {
+        /* already stopped */
+      }
+      resolve(text);
+    };
+    const timer = window.setTimeout(() => finish(""), 8000);
+    rec.onresult = (event) => {
+      const said = event.results[0]?.[0]?.transcript ?? "";
+      finish(said);
+    };
+    rec.onerror = () => finish("");
+    rec.start();
+  });
+}
+
+type SpeechRecognitionConstructor = new () => {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+declare global {
+  interface Window {
+    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: SpeechRecognitionConstructor;
+  }
+}
+
 function HaltedList({ feed }: { feed: DeskEvent[] }) {
   return (
     <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-5">
       <h2 className="text-base font-medium">Stopped on purpose</h2>
       <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
-        Revoked mandates, disputes, and stop-texting-me never get a retry. Calendar T+3 still hammers them.
+        Revoked mandates, disputes, already-paid claims, and stop-texting-me never get a retry. Calendar T+3 still hammers them.
       </p>
       {feed.length === 0 ? (
         <p className="mt-8 text-sm text-neutral-400">Terminal cases collect here as the night runs.</p>

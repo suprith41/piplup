@@ -55,6 +55,18 @@ function extractDay(text: string, billingDay: number): number | undefined {
   return day;
 }
 
+export function applyVoiceOverlay(c: RecoveryCase, transcript: string): RecoveryCase {
+  return enrichWithReply({
+    ...c,
+    customerReply: transcript,
+    optedOut: false,
+    claimedPaid: false,
+    chargeback: c.declineCode === "chargeback",
+    promiseToPayDay: undefined,
+    parsedReply: undefined,
+  });
+}
+
 /**
  * Turn an inbound message into structured state before policy runs.
  * Promise dates are derived here, not handed to us by the fixture.
@@ -72,6 +84,9 @@ export function enrichWithReply(c: RecoveryCase): RecoveryCase {
   }
   if (parsed.intent === "dispute") {
     enriched.chargeback = true;
+  }
+  if (parsed.intent === "already_paid") {
+    enriched.claimedPaid = true;
   }
   if (parsed.intent === "promise_to_pay" && parsed.promisedDay) {
     enriched.promiseToPayDay = parsed.promisedDay;

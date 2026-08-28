@@ -21,6 +21,9 @@ export function grantAdaptive(c: RecoveryCase): PolicyDecision {
   if (c.optedOut) {
     return stop(c, inferredClass, "Customer opted out. Contact freeze.");
   }
+  if (c.claimedPaid) {
+    return stop(c, inferredClass, "Customer says already paid. Freeze until we reconcile.");
+  }
   if (c.chargeback || inferredClass === "terminal") {
     return stop(c, inferredClass, "Terminal decline. Retrying burns an NPCI slot and can trigger network penalties.");
   }
@@ -45,18 +48,31 @@ export function grantAdaptive(c: RecoveryCase): PolicyDecision {
 
   if (inferredClass === "instrument") {
     const mutation: Mutation = c.mandateState === "paused" || c.declineCode === "mandate_paused" ? "mandate_reauth" : "payment_link";
+    const scheduledDay = c.promiseToPayDay ?? c.billingDay;
     return allow(
       c,
       inferredClass,
       "async_dunning",
       mutation,
-      c.billingDay,
-      "Dead or stale instrument. Mutate the instrument — do not replay the same mandate.",
+      scheduledDay,
+      c.promiseToPayDay
+        ? `Dead instrument. Customer promised day ${c.promiseToPayDay}. Hold the recovery link until then.`
+        : "Dead or stale instrument. Mutate the instrument — do not replay the same mandate.",
     );
   }
 
   if (inferredClass === "behavioral") {
-    return allow(c, inferredClass, "async_dunning", "payment_link", c.billingDay, "Checkout dropped after instrument select. Send a one-time recovery link, do not auto-debit.");
+    const scheduledDay = c.promiseToPayDay ?? c.billingDay;
+    return allow(
+      c,
+      inferredClass,
+      "async_dunning",
+      "payment_link",
+      scheduledDay,
+      c.promiseToPayDay
+        ? `Checkout dropped. Customer promised day ${c.promiseToPayDay}. Do not chase before then.`
+        : "Checkout dropped after instrument select. Send a one-time recovery link, do not auto-debit.",
+    );
   }
 
   // financial

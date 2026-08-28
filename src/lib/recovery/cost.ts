@@ -22,7 +22,7 @@ export function adaptiveCostPaise(c: RecoveryCase, decision: PolicyDecision): nu
 
   if (decision.clock === "stop") {
     // Never message a chargeback or an opt-out. Both are contact freezes.
-    if (c.chargeback || c.optedOut) return CHANNEL_COST_PAISE.silent;
+    if (c.chargeback || c.optedOut || c.claimedPaid) return CHANNEL_COST_PAISE.silent;
     return CHANNEL_COST_PAISE.whatsapp;
   }
 

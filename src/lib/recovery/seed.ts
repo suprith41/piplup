@@ -53,6 +53,7 @@ function base(i: number, trueClass: DeclineClass, declineCode: string): Recovery
     billingDay: 1,
     optedOut: false,
     chargeback: false,
+    claimedPaid: false,
     willSucceedOn: {
       sameRailImmediate: false,
       nextRailImmediate: false,
@@ -64,7 +65,7 @@ function base(i: number, trueClass: DeclineClass, declineCode: string): Recovery
   };
 }
 
-/** 110 labeled cases. The evaluate harness is only honest if this mix is ugly. */
+/** 112 labeled cases. The evaluate harness is only honest if this mix is ugly. */
 export function seedBatch(): RecoveryCase[] {
   const cases: RecoveryCase[] = [];
 
@@ -155,6 +156,18 @@ export function seedBatch(): RecoveryCase[] {
     }
     cases.push(c);
   }
+
+  // Looks like NSF. Inbound text is the only signal that we must not retry.
+  const paid = base(110, "terminal", "insufficient_funds");
+  paid.customerReply = "payment done, I already paid";
+  cases.push(paid);
+
+  // Promised day 3. Money never shows up. Adaptive waits; T+3 still hammers.
+  const broken = base(111, "financial", "insufficient_funds");
+  broken.salaryDay = 5;
+  broken.customerReply = "I'll pay on the 3rd";
+  broken.willSucceedOn.sameRailOnSalaryDay = false;
+  cases.push(broken);
 
   return cases;
 }

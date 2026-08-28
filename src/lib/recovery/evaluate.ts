@@ -1,3 +1,4 @@
+import { writeLastBatch } from "./ledger.ts";
 import { enrichWithReply } from "./reply.ts";
 import { seedBatch } from "./seed.ts";
 import { exposurePaise, runPolicy } from "./simulate.ts";
@@ -41,9 +42,10 @@ export function evaluateBatch(rawCases: RecoveryCase[] = seedBatch()): Evaluatio
   const adaptive = runPolicy(cases, "adaptive");
 
   const lift = computeLift(cases, baseline, adaptive);
+  const generatedAt = new Date().toISOString();
 
-  return {
-    generatedAt: new Date().toISOString(),
+  const report: Evaluation = {
+    generatedAt,
     cases,
     baseline,
     baselineCharitable,
@@ -60,6 +62,34 @@ export function evaluateBatch(rawCases: RecoveryCase[] = seedBatch()): Evaluatio
       churnAvoided: baseline.involuntaryChurn - adaptive.involuntaryChurn,
     },
   };
+
+  writeLastBatch({
+    generatedAt,
+    cases: cases.length,
+    atRisk: adaptive.rupeesAtRisk,
+    recovered: adaptive.rupeesRecovered,
+    t3: baseline.rupeesRecovered,
+    lift: lift.incrementalRupees,
+    slotsSaved: report.delta.slotsSaved,
+    stopAccuracy: adaptive.stopAccuracy,
+    decisions: cases.map((c, i) => {
+      const attempt = adaptive.attempts[i];
+      return {
+        caseId: c.id,
+        name: c.customerName,
+        decline: c.declineCode,
+        klass: c.trueClass,
+        clock: attempt.decision.clock,
+        mutation: attempt.decision.mutation,
+        recovered: attempt.recovered,
+        stopped: !attempt.executed,
+        reason: attempt.decision.stopReason ?? attempt.decision.reason,
+        scheduledDay: attempt.decision.scheduledDay,
+      };
+    }),
+  });
+
+  return report;
 }
 
 /**

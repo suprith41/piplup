@@ -87,6 +87,8 @@ export interface RecoveryCase {
   liquidity?: LiquiditySignal;
   optedOut: boolean;
   chargeback: boolean;
+  /** Customer says the charge already cleared. Freeze retries until we reconcile. */
+  claimedPaid: boolean;
   /** Raw inbound message. Parsed into promiseToPayDay / optedOut before policy runs. */
   customerReply?: string;
   parsedReply?: ParsedReply;

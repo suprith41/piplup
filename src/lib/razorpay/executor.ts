@@ -1,5 +1,6 @@
+import { appendLedger, latestHeardVoice } from "../recovery/ledger.ts";
 import { grantAdaptive } from "../recovery/policy.ts";
-import { enrichWithReply } from "../recovery/reply.ts";
+import { applyVoiceOverlay, enrichWithReply } from "../recovery/reply.ts";
 import { seedBatch } from "../recovery/seed.ts";
 import { exposurePaise } from "../recovery/simulate.ts";
 import type { RecoveryCase } from "../recovery/types.ts";
@@ -12,7 +13,27 @@ const LINK_MUTATIONS = new Set(["payment_link", "mandate_reauth"]);
 export const DEMO_CASE_IDS = ["rc_071", "rc_072", "rc_096"] as const;
 
 export function caseById(id: string): RecoveryCase | undefined {
-  return seedBatch().map(enrichWithReply).find((c) => c.id === id);
+  const c = seedBatch().map(enrichWithReply).find((row) => row.id === id);
+  if (!c) return undefined;
+  const voice = latestHeardVoice(c.id);
+  return voice?.transcript ? applyVoiceOverlay(c, voice.transcript) : c;
+}
+
+function logLink(line: Omit<AuditLine, "at">): AuditLine {
+  const full = appendAudit(line);
+  if (full.outcome !== "reused") {
+    appendLedger({
+      kind: "link",
+      caseId: full.caseId,
+      mutation: full.mutation,
+      granted: full.granted,
+      reason: full.reason,
+      outcome: full.outcome,
+      linkUrl: full.link?.shortUrl,
+      error: full.error,
+    });
+  }
+  return full;
 }
 
 export async function executeRecovery(
@@ -21,7 +42,7 @@ export async function executeRecovery(
 ): Promise<AuditLine> {
   const c = caseById(caseId);
   if (!c) {
-    return appendAudit({
+    return logLink({
       caseId,
       mutation: "none",
       granted: false,
@@ -34,7 +55,7 @@ export async function executeRecovery(
   const decision = grantAdaptive(c);
 
   if (!decision.allowed || !LINK_MUTATIONS.has(decision.mutation)) {
-    return appendAudit({
+    return logLink({
       caseId,
       mutation: decision.mutation,
       granted: false,
@@ -46,7 +67,7 @@ export async function executeRecovery(
 
   const existing = findLink(caseId);
   if (existing) {
-    return appendAudit({
+    return logLink({
       caseId,
       mutation: decision.mutation,
       granted: true,
@@ -57,7 +78,7 @@ export async function executeRecovery(
   }
 
   if (options.injectTimeout) {
-    return appendAudit({
+    return logLink({
       caseId,
       mutation: decision.mutation,
       granted: true,
@@ -84,7 +105,7 @@ export async function executeRecovery(
       },
     });
 
-    return appendAudit({
+    return logLink({
       caseId,
       mutation: decision.mutation,
       granted: true,
@@ -93,7 +114,7 @@ export async function executeRecovery(
       link,
     });
   } catch (error) {
-    return appendAudit({
+    return logLink({
       caseId,
       mutation: decision.mutation,
       granted: true,

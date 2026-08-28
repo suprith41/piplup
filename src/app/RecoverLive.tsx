@@ -20,6 +20,28 @@ type Row = {
   link?: { id: string; shortUrl: string; status: string };
 };
 
+type LedgerLine = {
+  at: string;
+  kind: string;
+  caseId: string;
+  mutation: string;
+  outcome: string;
+  reason: string;
+  transcript?: string;
+  linkUrl?: string;
+  error?: string;
+};
+
+type LastBatch = {
+  generatedAt: string;
+  cases: number;
+  recovered: number;
+  t3: number;
+  lift: number;
+  slotsSaved: number;
+  stopAccuracy: number;
+};
+
 type Inbox = { caseId: string; name: string; decline: string; email: string };
 
 export function RecoverLive() {
@@ -33,6 +55,10 @@ export function RecoverLive() {
   const [mailBusy, setMailBusy] = useState(false);
   const [mailNote, setMailNote] = useState<string | null>(null);
   const [quota, setQuota] = useState<Record<string, { sent: number; left: number }>>({});
+  const [ledger, setLedger] = useState<LedgerLine[]>([]);
+  const [paidIds, setPaidIds] = useState<string[]>([]);
+  const [lastBatch, setLastBatch] = useState<LastBatch | null>(null);
+  const [paidNote, setPaidNote] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/razorpay/status")
@@ -42,7 +68,20 @@ export function RecoverLive() {
       .then((r) => r.json())
       .then((d: { audit?: Row[] }) => setRows(d.audit ?? []));
     void loadMail();
+    void loadLedger();
   }, []);
+
+  async function loadLedger() {
+    const res = await fetch("/api/ledger");
+    const d = (await res.json()) as {
+      entries?: LedgerLine[];
+      paidCaseIds?: string[];
+      lastBatch?: LastBatch | null;
+    };
+    setLedger(d.entries ?? []);
+    setPaidIds(d.paidCaseIds ?? []);
+    setLastBatch(d.lastBatch ?? null);
+  }
 
   async function loadMail() {
     const res = await fetch("/api/remind");
@@ -69,14 +108,50 @@ export function RecoverLive() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ demo: true, injectTimeout }),
       });
-      const data = (await res.json()) as { rows?: Row[]; error?: string };
+      const data = (await res.json()) as { rows?: Row[]; paid?: { caseId: string; paid: boolean; reason: string }; error?: string };
       if (!res.ok) throw new Error(data.error ?? "recover failed");
-      setRows((prev) => [...prev, ...(data.rows ?? [])]);
+      const extra = data.rows ?? [];
+      if (extra.length) setRows((prev) => [...prev, ...extra]);
+      await loadLedger();
     } catch (err) {
       setError(err instanceof Error ? err.message : "recover failed");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function markPaid(caseId: string) {
+    setBusy(true);
+    setPaidNote(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markPaid: true, caseId }),
+      });
+      const data = (await res.json()) as { paid?: { caseId: string; reason: string }; error?: string };
+      if (!res.ok) throw new Error(data.error ?? "mark paid failed");
+      setPaidNote(data.paid ? `${data.paid.caseId}: ${data.paid.reason}` : "Marked paid.");
+      await loadLedger();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "mark paid failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function downloadBatch() {
+    const res = await fetch("/api/ledger");
+    const d = (await res.json()) as { lastBatch?: unknown };
+    if (!d.lastBatch) return;
+    const blob = new Blob([JSON.stringify(d.lastBatch, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "piplup-last-batch.json";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function sendMail() {
@@ -106,6 +181,8 @@ export function RecoverLive() {
           .join(" "),
       );
       await loadMail();
+      await loadLedger();
+      await loadLedger();
     } catch (err) {
       setMailNote(err instanceof Error ? err.message : "send failed");
     } finally {
@@ -161,6 +238,41 @@ export function RecoverLive() {
         >
           Inject timeout
         </button>
+        <button
+          type="button"
+          disabled={!lastBatch}
+          onClick={downloadBatch}
+          className="rounded border border-ink/20 px-4 py-2 text-sm disabled:opacity-40"
+        >
+          Download last batch
+        </button>
+      </div>
+      {lastBatch ? (
+        <p className="mt-2 text-xs text-ink/50">
+          Last batch · {lastBatch.cases} cases · lift {lastBatch.lift} · {lastBatch.slotsSaved} slots saved
+        </p>
+      ) : null}
+
+      <div className="mt-6">
+        <p className="mono text-[11px] uppercase tracking-wider text-ink/45">Close the loop</p>
+        <p className="mt-1 text-sm text-ink/65">
+          Razorpay cannot reach localhost. Mark a live link paid here — same function as the webhook.
+        </p>
+        <ul className="mt-3 flex flex-wrap gap-2">
+          {(status?.demo ?? []).map((d) => (
+            <li key={`paid-${d.id}`}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void markPaid(d.id)}
+                className="rounded border border-ink/20 px-3 py-1.5 text-xs disabled:opacity-40"
+              >
+                {paidIds.includes(d.id) ? `${d.name} paid` : `Mark ${d.name} paid`}
+              </button>
+            </li>
+          ))}
+        </ul>
+        {paidNote ? <p className="mt-2 text-sm text-ink/70">{paidNote}</p> : null}
       </div>
 
       <div className="mt-8 border-t border-ink/10 pt-6">
@@ -218,6 +330,29 @@ export function RecoverLive() {
       </div>
 
       {error ? <p className="mt-3 text-sm text-rust">{error}</p> : null}
+
+      {ledger.length > 0 ? (
+        <div className="mt-8 border-t border-ink/10 pt-6">
+          <p className="mono text-[11px] uppercase tracking-wider text-ink/45">Live ledger</p>
+          <ol className="mt-3 space-y-2 text-sm">
+            {ledger.slice(0, 16).map((row, i) => (
+              <li key={`${row.at}-${row.kind}-${i}`} className="border-t border-ink/5 pt-2">
+                <p className="mono text-[11px] uppercase tracking-wider text-ink/40">
+                  {row.kind} · {row.outcome} · {row.caseId}
+                </p>
+                <p className="mt-1 text-ink/70">{row.reason}</p>
+                {row.transcript ? <p className="mt-1 text-xs italic text-ink/50">“{row.transcript}”</p> : null}
+                {row.linkUrl ? (
+                  <a className="mt-1 inline-block text-moss underline" href={row.linkUrl} target="_blank" rel="noreferrer">
+                    {row.linkUrl}
+                  </a>
+                ) : null}
+                {row.error ? <p className="mt-1 text-xs text-rust">{row.error}</p> : null}
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
 
       {rows.length > 0 ? (
         <ol className="mt-5 space-y-2 text-sm">
