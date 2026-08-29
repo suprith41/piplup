@@ -12,7 +12,8 @@ row("recovered (gross)", inr(report.baseline.rupeesRecovered), inr(report.baseli
 row("recovery rate", pct(report.baseline.recoveryRate), pct(report.baselineCharitable.recoveryRate), pct(report.adaptive.recoveryRate));
 row("outreach spend", inr(report.baseline.rupeesSpent), inr(report.baselineCharitable.rupeesSpent), inr(report.adaptive.rupeesSpent));
 row("net of chase cost", inr(report.baseline.rupeesNet), inr(report.baselineCharitable.rupeesNet), inr(report.adaptive.rupeesNet));
-row("retries used", report.baseline.retriesUsed, report.baselineCharitable.retriesUsed, report.adaptive.retriesUsed);
+row("NPCI debits spent", report.baseline.retriesUsed, report.baselineCharitable.retriesUsed, report.adaptive.retriesUsed);
+row("out-of-band actions", report.baseline.outOfBandActions, report.baselineCharitable.outOfBandActions, report.adaptive.outOfBandActions);
 row("slots wasted", report.baseline.slotsWasted, report.baselineCharitable.slotsWasted, report.adaptive.slotsWasted);
 row("involuntary churn", report.baseline.involuntaryChurn, report.baselineCharitable.involuntaryChurn, report.adaptive.involuntaryChurn);
 row("stop accuracy", pct(report.baseline.stopAccuracy), pct(report.baselineCharitable.stopAccuracy), pct(report.adaptive.stopAccuracy));
@@ -25,6 +26,10 @@ console.log("\nIncremental lift (the number vendors do not publish)");
 liftBlock("vs T+3 all", report.lift);
 liftBlock("vs T+3 charitable", report.liftCharitable);
 
+console.log("\nOf which: revoked mandates re-authorised");
+console.log(`  ${report.reauth.cases} customers came back, ${inr(report.reauth.rupees)}`);
+console.log(`  ${report.reauth.slotsNotSpent} NPCI debits the calendar spends on dead mandates and we do not.`);
+
 console.log("\nOf which: uncollected-invoice sweep");
 console.log(`  ${report.sweep.cases} revived subscriptions, ${inr(report.sweep.rupees)}`);
 console.log(`  ${pct(report.sweep.shareOfIncremental)} of incremental lift comes from money`);
@@ -33,7 +38,7 @@ console.log("  the calendar flow has no path to charge at all.");
 console.log("\nDelta vs T+3 all");
 console.log(`  +${inr(report.delta.extraRupeesRecovered)} gross`);
 console.log(`  +${inr(report.delta.netAdvantage)} net of chase cost`);
-console.log(`  ${report.delta.retriesSaved} fewer retries`);
+console.log(`  ${report.delta.retriesSaved} fewer NPCI debits`);
 console.log(`  ${report.delta.slotsSaved} NPCI slots saved`);
 console.log(`  ${report.delta.churnAvoided} recoverable subscriptions kept alive`);
 console.log("");

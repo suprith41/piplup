@@ -1,3 +1,4 @@
+import { groqStatus } from "@/lib/llm/groq";
 import { queuePreview } from "@/lib/autopilot/engine";
 import { mailStatus } from "@/lib/email/send";
 import { EUREKA } from "@/lib/merchant/eureka";
@@ -13,6 +14,7 @@ export function GET() {
     merchant: EUREKA,
     razorpay: razorpayStatus(),
     mail: mailStatus(),
+    groq: groqStatus(),
     kpis: {
       atRisk: formatINR(Math.round(report.adaptive.rupeesAtRisk * 100)),
       recovered: formatINR(Math.round(report.adaptive.rupeesRecovered * 100)),

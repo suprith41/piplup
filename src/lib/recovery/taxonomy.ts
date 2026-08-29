@@ -1,4 +1,4 @@
-import type { DeclineClass, RecoveryCase } from "./types.ts";
+import type { BankSignal, DeclineClass, RecoveryCase } from "./types.ts";
 
 const TECHNICAL = new Set([
   "gateway_timeout",
@@ -42,6 +42,39 @@ export function classifyDecline(input: Pick<RecoveryCase, "declineCode" | "manda
   if (INSTRUMENT.has(input.declineCode) || input.mandateState === "paused") return "instrument";
   if (BEHAVIORAL.has(input.declineCode)) return "behavioral";
   return "financial";
+}
+
+/**
+ * A revoked mandate is terminal for the *debit* and nothing else. The customer
+ * can still re-authorise, and asking them to costs no NPCI slot. Lumping it in
+ * with chargebacks is how recovery tools leave money on the table.
+ */
+export function isRevokedMandate(input: Pick<RecoveryCase, "declineCode" | "mandateState">): boolean {
+  return input.mandateState === "revoked" || input.declineCode === "mandate_revoked";
+}
+
+/** Cases where any outbound contact is wrong, not just any debit. */
+export function isContactFrozen(
+  input: Pick<RecoveryCase, "declineCode" | "chargeback" | "optedOut" | "claimedPaid">,
+): boolean {
+  return (
+    input.chargeback ||
+    input.optedOut ||
+    input.claimedPaid ||
+    input.declineCode === "chargeback" ||
+    input.declineCode === "do_not_retry"
+  );
+}
+
+/**
+ * Which bank-side condition we are looking at. A switch that is merely slow
+ * clears on its own; core banking being down does not.
+ */
+export function bankSignalFor(input: Pick<RecoveryCase, "bankSignal" | "declineCode">): BankSignal {
+  if (input.bankSignal) return input.bankSignal;
+  return input.declineCode === "gateway_timeout" || input.declineCode === "network_error"
+    ? "latency_spike"
+    : "cbs_down";
 }
 
 export function rupees(paise: number): number {

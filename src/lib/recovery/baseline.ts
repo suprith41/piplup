@@ -30,6 +30,8 @@ export function grantT3(c: RecoveryCase, policy: PolicyName = "t3_calendar"): Po
       reason: "Calendar flow has no path here. The invoices exist but nothing charges them.",
       allowed: false,
       stopReason: "Not modelled by the retry cycle.",
+      npciSlotsUsed: 0,
+      npciSlotsLeftAfter: Math.max(0, c.retryBudgetLeft),
     };
   }
 
@@ -45,5 +47,9 @@ export function grantT3(c: RecoveryCase, policy: PolicyName = "t3_calendar"): Po
         : "Calendar policy: retry the same debit on T+1, T+2, T+3 regardless of decline class.",
     allowed: true,
     scheduledDay: c.billingDay + 1,
+    // The calendar plans the whole cycle up front; the simulator counts what it
+    // actually burns, because that is the number Adaptive has to beat.
+    npciSlotsUsed: 0,
+    npciSlotsLeftAfter: Math.max(0, c.retryBudgetLeft),
   };
 }

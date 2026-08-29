@@ -55,16 +55,31 @@ function extractDay(text: string, billingDay: number): number | undefined {
   return day;
 }
 
-export function applyVoiceOverlay(c: RecoveryCase, transcript: string): RecoveryCase {
-  return enrichWithReply({
+export function applyParsedReply(c: RecoveryCase, parsed: ParsedReply): RecoveryCase {
+  const enriched: RecoveryCase = {
     ...c,
-    customerReply: transcript,
+    customerReply: parsed.raw,
     optedOut: false,
     claimedPaid: false,
     chargeback: c.declineCode === "chargeback",
     promiseToPayDay: undefined,
-    parsedReply: undefined,
-  });
+    parsedReply: parsed,
+  };
+
+  if (parsed.confidence < 0.6) return enriched;
+
+  if (parsed.intent === "opt_out") enriched.optedOut = true;
+  if (parsed.intent === "dispute") enriched.chargeback = true;
+  if (parsed.intent === "already_paid") enriched.claimedPaid = true;
+  if (parsed.intent === "promise_to_pay" && parsed.promisedDay) {
+    enriched.promiseToPayDay = parsed.promisedDay;
+  }
+
+  return enriched;
+}
+
+export function applyVoiceOverlay(c: RecoveryCase, transcript: string): RecoveryCase {
+  return applyParsedReply(c, parseReply(transcript, c.billingDay));
 }
 
 /**
@@ -73,26 +88,7 @@ export function applyVoiceOverlay(c: RecoveryCase, transcript: string): Recovery
  */
 export function enrichWithReply(c: RecoveryCase): RecoveryCase {
   if (!c.customerReply) return c;
-
-  const parsed = parseReply(c.customerReply, c.billingDay);
-  const enriched: RecoveryCase = { ...c, parsedReply: parsed };
-
-  if (parsed.confidence < 0.6) return enriched;
-
-  if (parsed.intent === "opt_out") {
-    enriched.optedOut = true;
-  }
-  if (parsed.intent === "dispute") {
-    enriched.chargeback = true;
-  }
-  if (parsed.intent === "already_paid") {
-    enriched.claimedPaid = true;
-  }
-  if (parsed.intent === "promise_to_pay" && parsed.promisedDay) {
-    enriched.promiseToPayDay = parsed.promisedDay;
-  }
-
-  return enriched;
+  return applyParsedReply(c, parseReply(c.customerReply, c.billingDay));
 }
 
 export function replyIntentLabel(intent: ReplyIntent): string {

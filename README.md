@@ -2,15 +2,16 @@
 
 Track 03 — AI Revenue Recovery for the [Razorpay AI Buildathon](https://razorpay.com/buildathon/).
 
-Stripe-style **two-clock recovery** on Indian rails, demoed as the recovery desk for **Eureka Labs** — an online AI/ML course subscription. Not a retry bot.
+Stripe-grade recovery intelligence on **Razorpay's Indian rails**, demoed as the recovery desk for **Eureka Labs** — an online AI/ML course subscription. Not a retry bot.
 
 - Type the decline first.
 - Mutate the next attempt. Do not replay the same debit.
-- Cascade *now* if it is technical. Dunning *later* if it is money.
-- Stop when a retry burns an NPCI slot.
-- Score Adaptive Recovery against a Razorpay-style **T+3 calendar** on the same 100 labeled cases.
+- Cascade *now* if the bank is down; hold a few seconds if the bank is merely slow.
+- Dunning *later* if it is money. Wait for salary day, not T+1.
+- Treat the **NPCI budget (1 original + 3 retries)** as the scarce resource. A revoked mandate gets a re-auth ask, not a retry.
+- Score it against a Razorpay-style **T+3 calendar** on the same 112 labeled cases.
 
-We do **not** fake ISO 8583 Adaptive Acceptance or a global card graph. Those need issuer pipes. The method is what we port.
+We do **not** fake ISO 8583 Adaptive Acceptance or a global card graph. Those need issuer pipes. The method is what we port; the rails are Indian.
 
 ## Run
 
@@ -27,10 +28,18 @@ Open [http://localhost:3000](http://localhost:3000).
 On the seeded batch, Adaptive Recovery should:
 
 - recover more rupees than T+3
-- use fewer retries
-- waste zero NPCI slots on revoked / chargeback / opt-out cases
+- spend fewer NPCI debits doing it
+- waste zero slots on revoked / chargeback / opt-out cases
 
 That is Stripe’s published shape (more recovery, fewer attempts), implemented as an India-rail agent.
+
+## The three Indian constraints the engine is built around
+
+| Constraint | What the engine does |
+| --- | --- |
+| **NPCI caps mandate debits** at 1 original + 3 retries | Every decision carries `npciSlotsUsed`. Only same-rail retry, cooldown retry and rail cascade spend from it. A revoked mandate spends **zero** and gets a re-auth ask instead, because the debit is dead but the customer is not. Exhausting the budget downgrades to a link rather than ending recovery. |
+| **Bank downtime is not one thing** | A slow switch clears if you hold ~8s and re-present the same rail; the backup rail is behind the same bank and is just as slow. Core banking being down is the reverse. The seed labels both, so a policy that always cascades loses the first group and one that always waits loses the second. |
+| **RBI and domestic-card rules** | A debit moved to a new date needs a fresh 24h pre-debit notice, which can push the debit a day later. Indian domestic cards cannot be manually charged at all, so those cases only ever get a customer-completed link. |
 
 ## Prior art
 
@@ -48,10 +57,10 @@ Failed-payment recovery is an established category. This project does not claim 
 
 Piplup ships the measurement instead of the claim:
 
-1. **A reproducible A/B harness.** One command runs the same 100 labeled cases through a calendar T+3 baseline and through Adaptive Recovery, and prints both. Clone it and verify the numbers yourself.
+1. **A reproducible A/B harness.** One command runs the same 112 labeled cases through a calendar T+3 baseline and through Adaptive Recovery, and prints both. Clone it and verify the numbers yourself.
 2. **Incremental lift, not gross recovery.** Cases the calendar would have won anyway do not count as ours. The harness reports adaptive-only wins, cases neither policy could save, and regressions where the baseline beat us.
 3. **Net of chase cost.** Every message, notice and retry has a price. Gross recovery ignores it; we subtract it. Calendar retries look cheap until you count the failure emails they trigger.
-4. **Refusal as a reported metric.** Recovery tools sell upside. None of them report the money they correctly *declined* to chase, even though burning NPCI retry slots on revoked mandates is the real failure mode. Here, a correct stop scores as a win.
+4. **Refusal as a reported metric.** Recovery tools sell upside. None of them report the money they correctly *declined* to chase, even though burning NPCI retry slots on revoked mandates is the real failure mode. Here, a correct refusal scores as a win — and it is scored as *"spent no NPCI slot on a case that must not be debited"*, not as "did nothing", because refusing the debit and refusing the customer are different decisions.
 
 ## Baseline assumptions
 

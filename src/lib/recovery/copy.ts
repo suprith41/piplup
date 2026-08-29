@@ -8,7 +8,11 @@ export function hinglishNudge(c: RecoveryCase, decision: PolicyDecision): string
   if (decision.clock === "stop") {
     return `${c.customerName} ji, Eureka Labs AutoPay pe retry nahi karenge. Pehle naya AutoPay set karna hoga, warna course access band ho jayega.`;
   }
-  if (decision.mutation === "next_rail") {
+  if (decision.clock === "terminal_mutation") {
+    return `${c.customerName} ji, aapka AutoPay mandate cancel ho chuka hai — hum baar-baar debit try nahi karenge. Ek naya AutoPay set kar do, 30 second ka kaam hai, course chalta rahega.`;
+  }
+  // Cascade and cooldown both finish before the customer knows anything failed.
+  if (decision.clock === "sync_cascade") {
     return "";
   }
   if (c.promiseToPayDay) {

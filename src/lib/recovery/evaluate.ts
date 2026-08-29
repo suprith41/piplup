@@ -23,6 +23,15 @@ export interface Evaluation {
     rupees: number;
     shareOfIncremental: number;
   };
+  /**
+   * Revoked mandates the calendar can only burn slots on. Recovered by asking
+   * for a fresh AutoPay, which costs nothing from the NPCI budget.
+   */
+  reauth: {
+    cases: number;
+    rupees: number;
+    slotsNotSpent: number;
+  };
   delta: {
     extraRupeesRecovered: number;
     retriesSaved: number;
@@ -53,6 +62,7 @@ export function evaluateBatch(rawCases: RecoveryCase[] = seedBatch()): Evaluatio
     lift,
     liftCharitable: computeLift(cases, baselineCharitable, adaptive),
     sweep: computeSweep(cases, adaptive, lift),
+    reauth: computeReauth(cases, baseline, adaptive),
     delta: {
       extraRupeesRecovered: round2(adaptive.rupeesRecovered - baseline.rupeesRecovered),
       retriesSaved: baseline.retriesUsed - adaptive.retriesUsed,
@@ -79,8 +89,10 @@ export function evaluateBatch(rawCases: RecoveryCase[] = seedBatch()): Evaluatio
         name: c.customerName,
         decline: c.declineCode,
         klass: c.trueClass,
+        bank: c.bank,
         clock: attempt.decision.clock,
         mutation: attempt.decision.mutation,
+        npciSlotsUsed: attempt.decision.npciSlotsUsed,
         recovered: attempt.recovered,
         stopped: !attempt.executed,
         reason: attempt.decision.stopReason ?? attempt.decision.reason,
@@ -127,6 +139,26 @@ function computeLift(cases: RecoveryCase[], baseline: PolicyScore, adaptive: Pol
     incrementalRupees: rupees(incrementalPaise),
     regressionRupees: rupees(regressionPaise),
   };
+}
+
+/**
+ * The NPCI budget guard, priced. Every revoked mandate is three slots the
+ * calendar spends and we do not, and some of them pay anyway.
+ */
+function computeReauth(cases: RecoveryCase[], baseline: PolicyScore, adaptive: PolicyScore) {
+  let recoveredCases = 0;
+  let recoveredPaise = 0;
+  let slotsNotSpent = 0;
+
+  cases.forEach((c, i) => {
+    if (c.mandateState !== "revoked") return;
+    slotsNotSpent += baseline.attempts[i].retriesUsed - adaptive.attempts[i].retriesUsed;
+    if (!adaptive.attempts[i].recovered) return;
+    recoveredCases += 1;
+    recoveredPaise += exposurePaise(c);
+  });
+
+  return { cases: recoveredCases, rupees: rupees(recoveredPaise), slotsNotSpent };
 }
 
 function computeSweep(cases: RecoveryCase[], adaptive: PolicyScore, lift: Lift) {

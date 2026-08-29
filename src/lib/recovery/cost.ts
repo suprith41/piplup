@@ -1,4 +1,4 @@
-import type { PolicyDecision, RecoveryCase } from "./types.ts";
+import type { PolicyDecision } from "./types.ts";
 
 /**
  * Chasing money is not free. Vendors quote gross recovery and never net it
@@ -15,14 +15,22 @@ export const CHANNEL_COST_PAISE = {
 /** A failed calendar retry still emails the customer and sends a hosted link. */
 export const T3_COST_PER_FAILED_RETRY_PAISE = CHANNEL_COST_PAISE.email + CHANNEL_COST_PAISE.sms;
 
-export function adaptiveCostPaise(c: RecoveryCase, decision: PolicyDecision): number {
+export function adaptiveCostPaise(decision: PolicyDecision): number {
+  // A cooldown or a rail switch happens inside the original attempt. The
+  // customer is never told, so there is nothing to pay for.
   if (decision.clock === "sync_cascade") {
     return CHANNEL_COST_PAISE.silent;
   }
 
+  // A stop is a stop: no debit and no message. Chargebacks, opt-outs and
+  // already-paid claims are contact freezes, not cheaper dunning.
   if (decision.clock === "stop") {
-    // Never message a chargeback or an opt-out. Both are contact freezes.
-    if (c.chargeback || c.optedOut || c.claimedPaid) return CHANNEL_COST_PAISE.silent;
+    return CHANNEL_COST_PAISE.silent;
+  }
+
+  // Re-authorising a dead mandate is one outbound ask and no debit, so there
+  // is no pre-debit notice to pay for either.
+  if (decision.clock === "terminal_mutation") {
     return CHANNEL_COST_PAISE.whatsapp;
   }
 

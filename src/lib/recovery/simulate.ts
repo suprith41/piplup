@@ -1,6 +1,6 @@
 import { grantT3 } from "./baseline.ts";
 import { adaptiveCostPaise, T3_COST_PER_FAILED_RETRY_PAISE } from "./cost.ts";
-import { grantAdaptive } from "./policy.ts";
+import { grantAdaptive, spendsNpciSlot } from "./policy.ts";
 import { rupees } from "./taxonomy.ts";
 import type {
   AttemptResult,
@@ -45,20 +45,27 @@ function isInvoluntaryChurn(c: RecoveryCase, end: SubscriptionState): boolean {
   return !c.optedOut && !c.chargeback && !c.claimedPaid;
 }
 
+/**
+ * Cases where presenting a debit is the wrong move no matter what it would
+ * recover. Reaching out is sometimes still fine; spending an NPCI slot is not.
+ */
+function mustNotDebit(c: RecoveryCase): boolean {
+  return c.trueClass === "terminal" || c.optedOut || c.chargeback || c.claimedPaid;
+}
+
 function simulateAdaptive(c: RecoveryCase): AttemptResult {
   const decision = grantAdaptive(c);
 
   if (!decision.allowed) {
-    const correctlyStopped = c.trueClass === "terminal" || c.optedOut || c.chargeback || c.claimedPaid;
     return {
       decision,
       executed: false,
       recovered: false,
       retriesUsed: 0,
       slotWasted: false,
-      costPaise: adaptiveCostPaise(c, decision),
+      costPaise: adaptiveCostPaise(decision),
       endedSubscriptionState: resolveEndState(c, false),
-      note: correctlyStopped ? "Correct stop. Slot saved." : "Stopped; no recovery path taken.",
+      note: mustNotDebit(c) ? "Correct stop. Slot saved." : "Stopped; no recovery path taken.",
     };
   }
 
@@ -67,16 +74,21 @@ function simulateAdaptive(c: RecoveryCase): AttemptResult {
     decision,
     executed: true,
     recovered,
-    retriesUsed: decision.mutation === "back_charge_invoices" ? 0 : 1,
-    slotWasted: false,
-    costPaise: adaptiveCostPaise(c, decision),
+    retriesUsed: decision.npciSlotsUsed,
+    // Adaptive only ever presents a debit on a mandate that can still take one.
+    slotWasted: decision.npciSlotsUsed > 0 && mustNotDebit(c),
+    costPaise: adaptiveCostPaise(decision),
     endedSubscriptionState: resolveEndState(c, recovered),
-    note: recovered
-      ? decision.mutation === "back_charge_invoices"
-        ? "Swept uncollected invoices on a revived subscription."
-        : "Recovered with mutated attempt."
-      : "Attempted, still open. Exception list.",
+    note: adaptiveNote(decision.mutation, recovered),
   };
+}
+
+function adaptiveNote(mutation: Mutation, recovered: boolean): string {
+  if (!recovered) return "Attempted, still open. Exception list.";
+  if (mutation === "back_charge_invoices") return "Swept uncollected invoices on a revived subscription.";
+  if (mutation === "cooldown_retry") return "Cleared on the same rail once the switch caught up.";
+  if (mutation === "mandate_reauth") return "Customer re-authorised. No NPCI slot spent getting here.";
+  return "Recovered with mutated attempt.";
 }
 
 function simulateT3(c: RecoveryCase, policy: PolicyName): AttemptResult {
@@ -140,6 +152,7 @@ function isHardDecline(c: RecoveryCase): boolean {
 }
 
 function succeeds(c: RecoveryCase, mutation: Mutation, day?: number): boolean {
+  if (mutation === "cooldown_retry") return c.willSucceedOn.sameRailAfterCooldown;
   if (mutation === "next_rail") return c.willSucceedOn.nextRailImmediate;
   if (mutation === "payment_link") return c.willSucceedOn.paymentLink;
   if (mutation === "mandate_reauth") return c.willSucceedOn.reauth;
@@ -163,19 +176,28 @@ function score(policy: PolicyName, cases: RecoveryCase[], attempts: AttemptResul
     0,
   );
 
-  const shouldStop = cases.filter((c) => c.trueClass === "terminal" || c.optedOut || c.chargeback || c.claimedPaid);
+  // Correct behaviour is "did not spend an NPCI slot", not "did nothing".
+  // Asking a revoked mandate to re-authorise is free; retrying it is not.
+  const shouldStop = cases.filter(mustNotDebit);
+  const spentNoSlot = (c: RecoveryCase) => {
+    const attempt = attempts[cases.indexOf(c)];
+    return Boolean(attempt) && attempt.retriesUsed === 0;
+  };
+
   const correctlyStoppedPaise = shouldStop.reduce((sum, c) => {
     const attempt = attempts[cases.indexOf(c)];
-    if (attempt && !attempt.executed) return sum + exposurePaise(c);
+    // Money we walked away from without touching the network. Anything we
+    // actually recovered out of band is counted as recovery, not as a refusal.
+    if (spentNoSlot(c) && attempt && !attempt.recovered) return sum + exposurePaise(c);
     return sum;
   }, 0);
 
-  const stopCorrect = shouldStop.filter((c) => {
-    const attempt = attempts[cases.indexOf(c)];
-    return attempt && !attempt.executed;
-  }).length;
+  const stopCorrect = shouldStop.filter(spentNoSlot).length;
 
   const retriesUsed = attempts.reduce((sum, a) => sum + a.retriesUsed, 0);
+  const outOfBandActions = attempts.filter(
+    (a) => a.executed && !spendsNpciSlot(a.decision.mutation) && a.decision.mutation !== "none",
+  ).length;
   const slotsWasted = attempts.filter((a) => a.slotWasted).length;
   const spentPaise = attempts.reduce((sum, a) => sum + a.costPaise, 0);
   const halted = attempts.filter((a) => a.endedSubscriptionState === "halted").length;
@@ -190,6 +212,7 @@ function score(policy: PolicyName, cases: RecoveryCase[], attempts: AttemptResul
     rupeesSpent: rupees(spentPaise),
     rupeesNet: rupees(recoveredPaise - spentPaise),
     retriesUsed,
+    outOfBandActions,
     slotsWasted,
     stopAccuracy: shouldStop.length ? stopCorrect / shouldStop.length : 1,
     recoveryRate: cases.length ? attempts.filter((a) => a.recovered).length / cases.length : 0,

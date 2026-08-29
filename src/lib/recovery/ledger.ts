@@ -15,6 +15,8 @@ export interface LedgerEntry {
   transcript?: string;
   intent?: string;
   confidence?: number;
+  promisedDay?: number;
+  source?: "rules" | "llm";
   linkUrl?: string;
   error?: string;
 }
@@ -24,8 +26,10 @@ export interface BatchDecision {
   name: string;
   decline: string;
   klass: string;
+  bank: string;
   clock: string;
   mutation: string;
+  npciSlotsUsed: number;
   recovered: boolean;
   stopped: boolean;
   reason: string;

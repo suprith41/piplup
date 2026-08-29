@@ -14,6 +14,7 @@ type Boot = {
   merchant: typeof EUREKA;
   razorpay: { configured: boolean; testMode: boolean };
   mail: { configured: boolean };
+  groq: { configured: boolean; model: string };
   kpis: {
     atRisk: string;
     recovered: string;
@@ -327,7 +328,8 @@ export function Desk() {
 
       <main className="mx-auto max-w-6xl px-6 py-8">
         <p className="text-sm text-neutral-500">
-          {EUREKA.cohort} · {EUREKA.cycle} · {EUREKA.operator} · Powered by Piplup
+          {EUREKA.cohort} · {EUREKA.cycle} · {EUREKA.operator}
+          {boot?.groq?.configured ? " · Groq" : " · rules"} · Powered by Piplup
           <Link className="ml-3 text-neutral-400 underline decoration-neutral-300" href="/lab">
             Lab
           </Link>
@@ -483,7 +485,7 @@ function DeskFloor(props: {
               <p className="mt-0.5 text-sm">
                 {row.name}{" "}
                 <span className="text-neutral-400">
-                  {row.amount} · {row.decline.replaceAll("_", " ")}
+                  {row.amount} · {row.decline.replaceAll("_", " ")} · {row.bank}
                 </span>
               </p>
             </li>
@@ -622,8 +624,10 @@ function StudentsTable({
             <tr>
               <th className="px-5 py-2 font-normal">Student</th>
               <th className="px-3 py-2 font-normal">Course</th>
+              <th className="px-3 py-2 font-normal">Bank</th>
               <th className="px-3 py-2 font-normal">Fail</th>
               <th className="px-3 py-2 font-normal">Piplup</th>
+              <th className="px-3 py-2 font-normal">NPCI</th>
               <th className="px-5 py-2 font-normal">Seat</th>
             </tr>
           </thead>
@@ -638,8 +642,10 @@ function StudentsTable({
                     {row.live ? <span className="ml-2 text-[10px] text-emerald-700">LIVE</span> : null}
                   </td>
                   <td className="px-3 py-2.5 text-neutral-500">{row.course}</td>
+                  <td className="px-3 py-2.5 text-neutral-500">{row.bank}</td>
                   <td className="px-3 py-2.5 text-neutral-500">{row.decline.replaceAll("_", " ")}</td>
                   <td className="px-3 py-2.5 text-neutral-500">{event?.action ?? (hot ? "on the wire" : "—")}</td>
+                  <td className="px-3 py-2.5 text-[11px] text-neutral-400">{npciCell(event)}</td>
                   <td className={`px-5 py-2.5 text-[11px] ${event ? tone(event) : "text-neutral-300"}`}>
                     {hot ? "hot" : event ? badge(event) : "waiting"}
                   </td>
@@ -892,7 +898,8 @@ function HaltedList({ feed }: { feed: DeskEvent[] }) {
     <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-5">
       <h2 className="text-base font-medium">Stopped on purpose</h2>
       <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
-        Revoked mandates, disputes, already-paid claims, and stop-texting-me never get a retry. Calendar T+3 still hammers them.
+        Disputes, already-paid claims and stop-texting-me get neither a debit nor a message. Calendar T+3 still hammers
+        them. Revoked mandates are not here — they keep their NPCI slots and get a re-auth ask instead.
       </p>
       {feed.length === 0 ? (
         <p className="mt-8 text-sm text-neutral-400">Terminal cases collect here as the night runs.</p>
@@ -937,6 +944,12 @@ function tone(e: DeskEvent): string {
   if (e.stopped) return "text-neutral-400";
   if (e.recovered) return "text-emerald-700";
   return "text-orange-700";
+}
+
+/** NPCI allows 1 original debit plus 3 retries. This column is what we spent of it. */
+function npciCell(e?: DeskEvent): string {
+  if (!e) return "—";
+  return e.npciSlotsUsed > 0 ? `−${e.npciSlotsUsed} · ${e.npciSlotsLeftAfter} left` : "0 spent";
 }
 
 function seatFor(id: string, byId: Record<string, DeskEvent>, hotId: string | null): Seat {

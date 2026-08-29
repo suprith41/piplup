@@ -1,5 +1,17 @@
 export type Rail = "upi_autopay" | "card" | "enach";
 
+/** Sponsor / issuer bank behind the mandate. Routing is a bank decision, not a rail decision. */
+export type Bank = "HDFC" | "SBI" | "ICICI" | "Axis" | "Kotak";
+
+/**
+ * Why the bank side failed, which decides cascade vs cooldown.
+ *
+ * A latency spike on a switch clears in seconds — re-present on the same rail
+ * and the customer never sees a failure. Core banking being down does not
+ * clear in seconds, so the only useful move is another rail.
+ */
+export type BankSignal = "latency_spike" | "cbs_down";
+
 export type MandateState = "active" | "paused" | "revoked" | "halted";
 
 /**
@@ -15,10 +27,18 @@ export type DeclineClass =
   /** Not a failed debit. Money owed on a revived subscription nobody charged. */
   | "uncollected";
 
-export type Clock = "sync_cascade" | "async_dunning" | "stop";
+/**
+ * Three ways to act, plus a freeze.
+ *
+ * `terminal_mutation` is the India-specific one: the mandate is dead, so the
+ * debit is over, but the customer is not. Re-authorising costs zero NPCI
+ * slots, which is why it is not the same thing as stopping.
+ */
+export type Clock = "sync_cascade" | "async_dunning" | "terminal_mutation" | "stop";
 
 export type Mutation =
   | "same_rail_retry"
+  | "cooldown_retry"
   | "next_rail"
   | "payment_link"
   | "mandate_reauth"
@@ -67,6 +87,9 @@ export interface RecoveryCase {
   customerName: string;
   amountPaise: number;
   rail: Rail;
+  bank: Bank;
+  /** Bank-side condition at attempt time. Only meaningful on a technical decline. */
+  bankSignal?: BankSignal;
   mandateState: MandateState;
   subscriptionState: SubscriptionState;
   declineCode: string;
@@ -101,6 +124,8 @@ export interface RecoveryCase {
   /** Simulator: which mutated attempts would actually clear. */
   willSucceedOn: {
     sameRailImmediate: boolean;
+    /** Switch was slow, not down: the same rail clears after a few seconds. */
+    sameRailAfterCooldown: boolean;
     nextRailImmediate: boolean;
     sameRailOnSalaryDay: boolean;
     paymentLink: boolean;
@@ -121,6 +146,14 @@ export interface PolicyDecision {
   scheduledDay?: number;
   /** Day we must send the RBI pre-debit notice, when the debit moves to a new date. */
   preDebitNoticeDay?: number;
+  /** Seconds to hold before re-presenting, when the switch is slow rather than down. */
+  cooldownSeconds?: number;
+  /**
+   * NPCI counts mandate debits, not outreach. A payment link or a re-auth
+   * request costs nothing from the 1 original + 3 retries budget.
+   */
+  npciSlotsUsed: number;
+  npciSlotsLeftAfter: number;
 }
 
 export interface AttemptResult {
@@ -144,7 +177,10 @@ export interface PolicyScore {
   rupeesCorrectlyStopped: number;
   rupeesSpent: number;
   rupeesNet: number;
+  /** Mandate debits presented to NPCI. Outreach is not counted here. */
   retriesUsed: number;
+  /** Links, re-auth requests and invoice sweeps: recovery that costs no NPCI slot. */
+  outOfBandActions: number;
   slotsWasted: number;
   stopAccuracy: number;
   recoveryRate: number;

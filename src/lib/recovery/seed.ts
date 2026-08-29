@@ -1,4 +1,4 @@
-import type { DeclineClass, Rail, RecoveryCase } from "./types.ts";
+import type { Bank, DeclineClass, Rail, RecoveryCase } from "./types.ts";
 
 const NAMES = [
   "Jensen Huang",
@@ -36,6 +36,12 @@ function rail(i: number): Rail {
   return (["upi_autopay", "card", "enach"] as const)[i % 3];
 }
 
+const BANKS: readonly Bank[] = ["HDFC", "SBI", "ICICI", "Axis", "Kotak"];
+
+function bank(i: number): Bank {
+  return BANKS[i % BANKS.length];
+}
+
 function base(i: number, trueClass: DeclineClass, declineCode: string): RecoveryCase {
   const on = rail(i);
   return {
@@ -43,6 +49,7 @@ function base(i: number, trueClass: DeclineClass, declineCode: string): Recovery
     customerName: name(i),
     amountPaise: amount(i),
     rail: on,
+    bank: bank(i),
     mandateState: "active",
     // A failed debit has already moved the subscription out of active.
     subscriptionState: "pending",
@@ -56,6 +63,7 @@ function base(i: number, trueClass: DeclineClass, declineCode: string): Recovery
     claimedPaid: false,
     willSucceedOn: {
       sameRailImmediate: false,
+      sameRailAfterCooldown: false,
       nextRailImmediate: false,
       sameRailOnSalaryDay: false,
       paymentLink: false,
@@ -69,10 +77,19 @@ function base(i: number, trueClass: DeclineClass, declineCode: string): Recovery
 export function seedBatch(): RecoveryCase[] {
   const cases: RecoveryCase[] = [];
 
-  // 25 technical — cascade to next rail works; same-rail T+3 usually does not
+  // 25 technical. The bank, not the rail, decides which move works.
+  //
+  // A slow switch is the same switch a minute later, so holding clears it —
+  // but the backup rail sits behind the same bank and is just as slow. Core
+  // banking being down is the opposite: holding is useless, routing around it
+  // is the only thing that works. A policy that always cascades loses the
+  // first group; one that always waits loses the second.
   for (let i = 0; i < 25; i += 1) {
-    const c = base(i, "technical", i % 2 === 0 ? "gateway_timeout" : "bank_downtime");
-    c.willSucceedOn.nextRailImmediate = true;
+    const latency = i % 2 === 0;
+    const c = base(i, "technical", latency ? "gateway_timeout" : "bank_downtime");
+    c.bankSignal = latency ? "latency_spike" : "cbs_down";
+    c.willSucceedOn.sameRailAfterCooldown = latency;
+    c.willSucceedOn.nextRailImmediate = !latency;
     c.willSucceedOn.sameRailImmediate = i % 7 === 0;
     cases.push(c);
   }
@@ -95,10 +112,13 @@ export function seedBatch(): RecoveryCase[] {
     cases.push(c);
   }
 
-  // 20 terminal revoked — T+3 burns slots. Adaptive must stop.
+  // 20 revoked mandates. T+3 burns three slots each and cannot win any of
+  // them. The debit is unrecoverable, the customer is not: some share will set
+  // up a fresh AutoPay when asked, and asking costs no NPCI slot.
   for (let i = 50; i < 70; i += 1) {
     const c = base(i, "terminal", "mandate_revoked");
     c.mandateState = "revoked";
+    c.willSucceedOn.reauth = i % 5 < 2;
     cases.push(c);
   }
 

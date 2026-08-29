@@ -5,11 +5,11 @@ import { DEMO_CASE_IDS, executeRecovery } from "../razorpay/executor.ts";
 import { hinglishNudge } from "../recovery/copy.ts";
 import { isCasePaid, latestHeardVoice } from "../recovery/ledger.ts";
 import { grantAdaptive, nextRail } from "../recovery/policy.ts";
-import { applyVoiceOverlay, enrichWithReply } from "../recovery/reply.ts";
+import { applyParsedReply, applyVoiceOverlay, enrichWithReply } from "../recovery/reply.ts";
 import { seedBatch } from "../recovery/seed.ts";
 import { exposurePaise, runPolicy } from "../recovery/simulate.ts";
 import { formatINR } from "../recovery/taxonomy.ts";
-import type { PolicyDecision, RecoveryCase } from "../recovery/types.ts";
+import type { ParsedReply, PolicyDecision, RecoveryCase } from "../recovery/types.ts";
 import type { DeskEvent, IngressEvent, QueueItem } from "./types.ts";
 
 export type { DeskEvent, IngressEvent, QueueItem } from "./types.ts";
@@ -28,7 +28,24 @@ export function nightQueue(): RecoveryCase[] {
 
 function withVoiceOverlay(c: RecoveryCase): RecoveryCase {
   const voice = latestHeardVoice(c.id);
-  return voice?.transcript ? applyVoiceOverlay(c, voice.transcript) : c;
+  if (!voice?.transcript) return c;
+
+  const parsed = parsedFromLedger(voice);
+  if (parsed) return applyParsedReply(c, parsed);
+  return applyVoiceOverlay(c, voice.transcript);
+}
+
+function parsedFromLedger(voice: { transcript?: string; intent?: string; confidence?: number; promisedDay?: number; source?: string }): ParsedReply | null {
+  const intents = new Set(["promise_to_pay", "already_paid", "dispute", "opt_out", "unclear"]);
+  if (!voice.transcript || !voice.intent || !intents.has(voice.intent)) return null;
+  if ((voice.confidence ?? 0) < 0.6) return null;
+  return {
+    raw: voice.transcript,
+    intent: voice.intent as ParsedReply["intent"],
+    promisedDay: voice.promisedDay,
+    confidence: voice.confidence ?? 0.6,
+    source: voice.source === "llm" ? "llm" : "rules",
+  };
 }
 
 export function queuePreview(): QueueItem[] {
@@ -40,6 +57,7 @@ export function queuePreview(): QueueItem[] {
     decline: c.declineCode,
     klass: c.trueClass,
     rail: c.rail,
+    bank: c.bank,
     course: eurekaCourse(c.id),
     live: LIVE.has(c.id),
     inbound: c.customerReply,
@@ -58,6 +76,7 @@ export function ingressFor(c: RecoveryCase): IngressEvent {
     amount: formatINR(exposurePaise(c)),
     decline: c.declineCode,
     rail: c.rail,
+    bank: c.bank,
     course: eurekaCourse(c.id),
     source: webhookSource(c),
     live: LIVE.has(c.id),
@@ -120,10 +139,14 @@ export function deskEvent(
     amountPaise: exposurePaise(c),
     decline: c.declineCode,
     rail: c.rail,
+    bank: c.bank,
     klass: c.trueClass,
     course: eurekaCourse(c.id),
     clock: decision.clock,
     mutation: decision.mutation,
+    npciSlotsUsed: decision.npciSlotsUsed,
+    npciSlotsLeftAfter: decision.npciSlotsLeftAfter,
+    cooldownSeconds: decision.cooldownSeconds,
     action:
       extra.live && recovered
         ? "Payment Link paid. Case closed."
@@ -152,6 +175,7 @@ export function previewNudge(caseId: string): string {
 function webhookSource(c: RecoveryCase): string {
   if (c.trueClass === "behavioral") return "checkout.abandoned";
   if (c.trueClass === "uncollected") return "invoice.uncollected";
+  if (c.mandateState === "revoked") return "subscription.mandate.revoked";
   return "subscription.charged.failed";
 }
 
@@ -165,8 +189,10 @@ function actionLine(
     return `Stopped. ${decision.stopReason ?? decision.reason}`;
   }
   switch (decision.mutation) {
+    case "cooldown_retry":
+      return `${c.bank} switch was lagging. Held ${decision.cooldownSeconds ?? 8}s and re-presented on ${railLabel(c.rail)} — no second rail needed.`;
     case "next_rail":
-      return `Cascaded ${railLabel(c.rail)} → ${railLabel(nextRail(c.rail))} in the same second.`;
+      return `${c.bank} down on ${railLabel(c.rail)}. Cascaded to ${railLabel(nextRail(c.rail))} in the same second.`;
     case "payment_link":
       if (c.promiseToPayDay && !recovered) {
         return `Held until day ${c.promiseToPayDay}. We will not chase before then.`;
@@ -177,6 +203,9 @@ function actionLine(
     case "mandate_reauth":
       if (c.promiseToPayDay && !recovered) {
         return `Held until day ${c.promiseToPayDay}. We will not chase before then.`;
+      }
+      if (decision.clock === "terminal_mutation") {
+        return "Mandate revoked. Spent 0 of 3 NPCI retries and asked for a fresh AutoPay instead.";
       }
       return "Asked the student to wake UPI AutoPay. Same mandate is dead.";
     case "back_charge_invoices":

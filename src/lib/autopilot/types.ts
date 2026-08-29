@@ -6,6 +6,7 @@ export type QueueItem = {
   decline: string;
   klass: string;
   rail: string;
+  bank: string;
   course: string;
   live: boolean;
   inbound?: string;
@@ -22,6 +23,7 @@ export type IngressEvent = {
   amount: string;
   decline: string;
   rail: string;
+  bank: string;
   course: string;
   source: string;
   live: boolean;
@@ -35,10 +37,15 @@ export type DeskEvent = {
   amountPaise: number;
   decline: string;
   rail: string;
+  bank: string;
   klass: string;
   course: string;
   clock: string;
   mutation: string;
+  /** Mandate debits this decision spends, out of the 1 original + 3 retries budget. */
+  npciSlotsUsed: number;
+  npciSlotsLeftAfter: number;
+  cooldownSeconds?: number;
   action: string;
   recovered: boolean;
   stopped: boolean;

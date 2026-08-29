@@ -1,10 +1,11 @@
 import { findLink } from "@/lib/razorpay/audit";
 import { DEMO_CASE_IDS } from "@/lib/razorpay/executor";
 import { deskEvent, nightQueue, previewNudge } from "@/lib/autopilot/engine";
-import { hinglishNudge } from "@/lib/recovery/copy";
+import { parseReplySmart } from "@/lib/llm/extract";
+import { groqStatus } from "@/lib/llm/groq";
+import { spokenNudge } from "@/lib/llm/rewrite";
 import { appendLedger, isCasePaid } from "@/lib/recovery/ledger";
 import { grantAdaptive } from "@/lib/recovery/policy";
-import { parseReply } from "@/lib/recovery/reply";
 import { runPolicy } from "@/lib/recovery/simulate";
 
 export const dynamic = "force-dynamic";
@@ -12,12 +13,18 @@ export const runtime = "nodejs";
 
 const LIVE = new Set<string>(DEMO_CASE_IDS);
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const caseId = new URL(request.url).searchParams.get("caseId") ?? "";
   if (!LIVE.has(caseId)) {
     return Response.json({ error: "Voice is only on the three live demo cases." }, { status: 400 });
   }
-  return Response.json({ spoken: previewNudge(caseId) });
+  const c = nightQueue().find((row) => row.id === caseId);
+  if (!c) return Response.json({ spoken: "" });
+  const decision = grantAdaptive(c);
+  return Response.json({
+    spoken: await spokenNudge(c, decision),
+    groq: groqStatus(),
+  });
 }
 
 export async function POST(request: Request) {
@@ -37,7 +44,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Unknown case." }, { status: 400 });
   }
 
-  const parsed = parseReply(transcript, before.billingDay);
+  const parsed = await parseReplySmart(transcript, before.billingDay);
   const ignored = parsed.confidence < 0.6;
   const prior = grantAdaptive(before);
 
@@ -47,11 +54,15 @@ export async function POST(request: Request) {
     mutation: prior.mutation,
     clock: prior.clock,
     granted: !ignored,
-    reason: ignored ? "Low confidence. Policy unchanged." : `Heard ${parsed.intent}.`,
+    reason: ignored
+      ? "Low confidence. Policy unchanged."
+      : `Heard ${parsed.intent} (${parsed.source}).`,
     outcome: ignored ? "ignored" : "heard",
     transcript,
     intent: parsed.intent,
     confidence: parsed.confidence,
+    promisedDay: parsed.promisedDay,
+    source: parsed.source,
     linkUrl: findLink(caseId)?.shortUrl,
   });
 
@@ -59,7 +70,8 @@ export async function POST(request: Request) {
     return Response.json({
       ignored: true,
       parsed,
-      spoken: hinglishNudge(before, prior),
+      spoken: await spokenNudge(before, prior),
+      groq: groqStatus(),
       event: null,
     });
   }
@@ -79,8 +91,8 @@ export async function POST(request: Request) {
   return Response.json({
     ignored: false,
     parsed,
-    spoken: hinglishNudge(c, decision),
+    spoken: await spokenNudge(c, decision),
+    groq: groqStatus(),
     event,
   });
 }
-
