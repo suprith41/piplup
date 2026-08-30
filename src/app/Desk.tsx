@@ -267,45 +267,63 @@ export function Desk() {
   const mix = mixCounts(boot?.queue ?? [], byId);
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-neutral-900">
-      <header className="border-b border-neutral-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-4">
-          <div className="flex flex-wrap items-center gap-8">
-            <div>
-              <p className="text-[11px] text-neutral-400">{EUREKA.city}</p>
-              <h1 className="text-lg font-semibold tracking-tight">{EUREKA.name}</h1>
-            </div>
-            <nav className="flex gap-1 text-sm">
-              <NavBtn active={tab === "desk"} onClick={() => setTab("desk")}>
-                Desk
-              </NavBtn>
-              <NavBtn active={tab === "students"} onClick={() => setTab("students")}>
-                Students
-              </NavBtn>
-              <NavBtn active={tab === "promises"} onClick={() => setTab("promises")}>
-                Promises
-              </NavBtn>
-              <NavBtn active={tab === "halted"} onClick={() => setTab("halted")}>
-                Stopped{stopped ? ` ${stopped}` : ""}
-              </NavBtn>
-              <NavBtn active={tab === "analytics"} onClick={() => setTab("analytics")}>
-                Analytics
-              </NavBtn>
-              <NavBtn active={tab === "prevent"} onClick={() => setTab("prevent")}>
-                Prevent
-              </NavBtn>
-            </nav>
+    <div className="flex min-h-screen bg-white text-[#02042b]">
+      <aside className="sticky top-0 flex h-screen w-[232px] shrink-0 flex-col border-r border-[#e6e9ee] bg-white">
+        <div className="flex items-center gap-2.5 px-5 py-5">
+          <span className="grid h-8 w-8 place-items-center rounded bg-[#305eff] text-[13px] font-extrabold text-white">E</span>
+          <div>
+            <p className="text-[13px] font-extrabold leading-none">{EUREKA.name}</p>
+            <p className="mt-1 text-[11px] text-[#6c737f]">{EUREKA.city}</p>
+          </div>
+        </div>
+        <nav className="flex flex-1 flex-col gap-0.5 px-3">
+          <NavBtn active={tab === "desk"} onClick={() => setTab("desk")}>
+            Desk
+          </NavBtn>
+          <NavBtn active={tab === "students"} onClick={() => setTab("students")}>
+            Students
+          </NavBtn>
+          <NavBtn active={tab === "promises"} onClick={() => setTab("promises")}>
+            Promises
+          </NavBtn>
+          <NavBtn active={tab === "halted"} onClick={() => setTab("halted")}>
+            Stopped{stopped ? ` · ${stopped}` : ""}
+          </NavBtn>
+          <NavBtn active={tab === "analytics"} onClick={() => setTab("analytics")}>
+            Analytics
+          </NavBtn>
+          <NavBtn active={tab === "prevent"} onClick={() => setTab("prevent")}>
+            Prevent
+          </NavBtn>
+        </nav>
+        <div className="border-t border-[#e6e9ee] px-5 py-4">
+          <p className="text-[11px] font-semibold text-[#305eff]">TEST MODE</p>
+          <p className="mt-1 text-[11px] leading-4 text-[#6c737f]">UPI AutoPay · eNACH · cards</p>
+          <Link className="mt-3 inline-block text-[12px] font-semibold text-[#305eff]" href="/lab">
+            Developer lab →
+          </Link>
+        </div>
+      </aside>
+
+      <div className="min-w-0 flex-1 bg-white">
+        <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e9ee] bg-white px-6 py-3">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6c737f]">
+              {EUREKA.cohort} · {EUREKA.cycle}
+            </p>
+            <p className="text-sm font-semibold">
+              {EUREKA.operator}
+              {boot?.groq?.configured ? " · Groq" : " · rules"}
+            </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <p className="mono text-xs tabular-nums text-neutral-400">
-              {clock || "—"} IST
-            </p>
-            <span className={`text-xs ${running ? "text-emerald-700" : "text-neutral-400"}`}>
+            <p className="mono text-xs tabular-nums text-[#6c737f]">{clock || "—"} IST</p>
+            <span className={`text-xs font-semibold ${running ? "text-[#0d9f6e]" : "text-[#6c737f]"}`}>
               <span className={running ? "desk-pulse" : ""}>{running ? "●" : "○"}</span>{" "}
               {running ? "Live" : done ? "Closed" : "Idle"}
             </span>
             {running ? (
-              <button type="button" className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm" onClick={stopNight}>
+              <button type="button" className="rzp-btn-ghost px-3 py-1.5" onClick={stopNight}>
                 Pause
               </button>
             ) : (
@@ -316,7 +334,7 @@ export function Desk() {
                   started.current = true;
                   void runNight();
                 }}
-                className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm disabled:opacity-40"
+                className="rzp-btn-ghost px-3 py-1.5 disabled:opacity-40"
               >
                 Replay
               </button>
@@ -325,22 +343,14 @@ export function Desk() {
               type="button"
               disabled={!boot?.mail.configured || mailing}
               onClick={() => void sendEmails()}
-              className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white disabled:opacity-40"
+              className="rzp-btn px-4 py-1.5 disabled:opacity-40"
             >
               {mailing ? "Sending…" : "Send emails"}
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <p className="text-sm text-neutral-500">
-          {EUREKA.cohort} · {EUREKA.cycle} · {EUREKA.operator}
-          {boot?.groq?.configured ? " · Groq" : " · rules"} · Powered by Piplup
-          <Link className="ml-3 text-neutral-400 underline decoration-neutral-300" href="/lab">
-            Lab
-          </Link>
-        </p>
+        <main className="px-6 py-6">
 
         {tab === "desk" ? (
           <DeskFloor
@@ -375,8 +385,9 @@ export function Desk() {
         {tab === "halted" ? <HaltedList feed={feed.filter((e) => e.stopped)} /> : null}
         {tab === "analytics" ? <AnalyticsBoard /> : null}
         {tab === "prevent" ? <PreventBoard /> : null}
-        {error ? <p className="mt-4 text-sm text-orange-700">{error}</p> : null}
-      </main>
+        {error ? <p className="mt-4 text-sm text-[#e5533c]">{error}</p> : null}
+        </main>
+      </div>
     </div>
   );
 }
@@ -394,7 +405,7 @@ function NavBtn({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-md px-3 py-1.5 ${active ? "bg-neutral-100 text-neutral-900" : "text-neutral-500 hover:text-neutral-800"}`}
+      className={`w-full rounded px-3 py-2 text-left text-[13px] ${active ? "bg-[#eef2ff] font-semibold text-[#305eff]" : "font-medium text-[#4f566b] hover:bg-[#f6f7f9] hover:text-[#02042b]"}`}
     >
       {children}
     </button>
@@ -449,10 +460,10 @@ function DeskFloor(props: {
   return (
     <div className="mt-8 space-y-8">
       <section>
-        <p key={tape} className="desk-in max-w-2xl text-2xl font-medium leading-8 tracking-tight">
+        <p key={tape} className="desk-in max-w-2xl font-display text-[32px] leading-10 text-[#02042b]">
           {tape}
         </p>
-        <p className="mt-2 text-sm text-neutral-500">
+        <p className="mt-2 text-sm text-ink/50">
           {running
             ? `${cursor} of ${total} handled.`
             : done
@@ -461,7 +472,7 @@ function DeskFloor(props: {
         </p>
       </section>
 
-      <section className="grid gap-px overflow-hidden rounded-xl border border-neutral-200 bg-neutral-200 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi label="Recovered tonight" value={formatINR(recoveredPaise)} hint={`${recovered} students`} />
         <Kpi label="At risk" value={boot?.kpis.atRisk ?? "—"} hint={`${boot?.kpis.cases ?? 0} seats`} />
         <Kpi label="Lift vs T+3" value={boot?.kpis.lift ?? "—"} hint={`T+3 keeps ${boot?.kpis.t3 ?? "—"}`} />
@@ -481,13 +492,13 @@ function DeskFloor(props: {
           />
         ))}
       </section>
-      {mailNote ? <p className="text-sm text-emerald-700">{mailNote}</p> : null}
+      {mailNote ? <p className="text-sm text-moss">{mailNote}</p> : null}
 
       <section className="grid gap-4 xl:grid-cols-2">
         <Tape title="Incoming" caption="Razorpay" empty="Waiting for the first failed AutoPay.">
           {ingress.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="border-t border-neutral-100 px-4 py-3 first:border-t-0">
-              <p className="text-xs text-neutral-400">
+            <li key={`${row.caseId}-${row.at}`} className="desk-in border-t border-ink/5 px-4 py-3 first:border-t-0">
+              <p className="text-xs text-ink/40">
                 {row.source}
                 {row.live ? " · live" : ""}
               </p>
@@ -502,7 +513,7 @@ function DeskFloor(props: {
         </Tape>
         <Tape title="Piplup" caption="Decisions" empty="Decisions land here.">
           {feed.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="border-t border-neutral-100 px-4 py-3 first:border-t-0">
+            <li key={`${row.caseId}-${row.at}`} className="desk-in border-t border-ink/5 px-4 py-3 first:border-t-0">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm">
                   {row.name} <span className="text-neutral-400">{row.amount}</span>
@@ -515,10 +526,10 @@ function DeskFloor(props: {
         </Tape>
       </section>
 
-      <section className="rounded-xl border border-neutral-200 bg-white p-5">
+      <section className="desk-card p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
-          <h2 className="text-sm font-medium">September cohort</h2>
-          <p className="text-xs text-neutral-400">
+          <h2 className="font-display text-base tracking-tight">September cohort</h2>
+          <p className="text-xs text-ink/40">
             {liveHits} live {liveHits === 1 ? "hit" : "hits"} · {cursor}/{total}
           </p>
         </div>
@@ -531,7 +542,7 @@ function DeskFloor(props: {
             />
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
+        <div className="mt-4 flex flex-wrap gap-4 text-xs text-ink/50">
           {mix.map((row) => (
             <p key={row.key}>
               <span className="text-neutral-800">{row.n}</span> {row.key}
@@ -559,10 +570,10 @@ function LiveCard({
   onVoiceNote: (note: string) => void;
 }) {
   return (
-    <article className={`rounded-xl border bg-white p-4 ${hot ? "border-emerald-400" : "border-neutral-200"}`}>
+    <article className={`desk-card p-4 ${hot ? "ring-2 ring-[#305eff]" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] text-emerald-700">Live</p>
+          <p className="text-[11px] uppercase tracking-wide text-moss">Live</p>
           <h3 className="mt-0.5 text-base font-medium">{row.name}</h3>
           <p className="text-xs text-neutral-400">
             {row.course} · {row.amount}
@@ -575,11 +586,11 @@ function LiveCard({
       <p className="mt-3 text-sm leading-6 text-neutral-600">
         {event?.action ?? `${row.decline.replaceAll("_", " ")}. Waiting.`}
       </p>
-      {event?.emailed ? <p className="mt-2 text-xs text-emerald-700">Mailed from Eureka Labs.</p> : null}
+      {event?.emailed ? <p className="mt-2 text-xs text-moss">Mailed from Eureka Labs.</p> : null}
       {event?.emailError ? <p className="mt-2 text-xs text-orange-700">{event.emailError}</p> : null}
       {mail && !event?.emailed ? <p className="mt-2 text-xs text-neutral-400">Mail only on Send emails.</p> : null}
       {event?.linkUrl ? (
-        <a className="mt-3 inline-block text-xs text-emerald-700 underline" href={event.linkUrl} target="_blank" rel="noreferrer">
+        <a className="mt-3 inline-block text-xs text-moss underline" href={event.linkUrl} target="_blank" rel="noreferrer">
           {event.linkUrl}
         </a>
       ) : null}
@@ -601,13 +612,13 @@ function Tape({
 }) {
   const emptyish = Array.isArray(children) && children.length === 0;
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white">
+    <div className="desk-card">
       <div className="flex items-baseline justify-between px-4 py-3">
-        <h2 className="text-sm font-medium">{title}</h2>
-        <p className="text-[11px] text-neutral-400">{caption}</p>
+        <h2 className="font-display text-base tracking-tight">{title}</h2>
+        <p className="text-[11px] text-ink/40">{caption}</p>
       </div>
-      <ul className="desk-scroll max-h-[360px] overflow-y-auto border-t border-neutral-100">
-        {emptyish ? <li className="px-4 py-12 text-center text-sm text-neutral-400">{empty}</li> : children}
+      <ul className="desk-scroll max-h-[360px] overflow-y-auto border-t border-ink/5">
+        {emptyish ? <li className="px-4 py-12 text-center text-sm text-ink/40">{empty}</li> : children}
       </ul>
     </div>
   );
@@ -623,13 +634,13 @@ function StudentsTable({
   hotId: string | null;
 }) {
   return (
-    <div className="mt-8 overflow-hidden rounded-xl border border-neutral-200 bg-white">
+    <div className="mt-8 overflow-hidden desk-card">
       <div className="px-5 py-4">
-        <h2 className="text-base font-medium">September roster</h2>
+        <h2 className="font-display text-lg tracking-tight">September roster</h2>
       </div>
       <div className="desk-scroll max-h-[70vh] overflow-auto">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 bg-white text-[11px] text-neutral-400">
+          <thead className="sticky top-0 bg-white text-[11px] text-ink/40">
             <tr>
               <th className="px-5 py-2 font-normal">Student</th>
               <th className="px-3 py-2 font-normal">Course</th>
@@ -645,10 +656,10 @@ function StudentsTable({
               const event = byId[row.id];
               const hot = hotId === row.id;
               return (
-                <tr key={row.id} className="border-t border-neutral-100">
+                <tr key={row.id} className="border-t border-ink/5">
                   <td className="px-5 py-2.5">
                     {row.name}
-                    {row.live ? <span className="ml-2 text-[10px] text-emerald-700">LIVE</span> : null}
+                    {row.live ? <span className="ml-2 text-[10px] text-moss">LIVE</span> : null}
                   </td>
                   <td className="px-3 py-2.5 text-neutral-500">{row.course}</td>
                   <td className="px-3 py-2.5 text-neutral-500">{row.bank}</td>
@@ -685,15 +696,15 @@ function PromisesBoard({ queue, byId }: { queue: QueueItem[]; byId: Record<strin
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
   return (
-    <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-5">
-      <h2 className="text-base font-medium">Promise to pay</h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+    <div className="mt-8 desk-card p-5">
+      <h2 className="font-display text-lg tracking-tight">Promise to pay</h2>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-ink/55">
         Inbound replies become a date, a freeze, or a broken promise. Policy waits. It does not guess.
       </p>
       {rows.length === 0 ? (
         <p className="mt-8 text-sm text-neutral-400">Promises land here as the night runs, or after a live call.</p>
       ) : (
-        <ul className="mt-6 divide-y divide-neutral-100">
+        <ul className="mt-6 divide-y divide-ink/5">
           {rows.map(({ row, event, status, day, quote }) => (
             <li key={row.id} className="py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -826,7 +837,7 @@ function CallButton({
         type="button"
         disabled={phase !== "idle"}
         onClick={() => void call()}
-        className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs disabled:opacity-40"
+        className="rounded px-3 py-1.5 text-xs font-semibold text-[#305eff] disabled:opacity-40"
       >
         {label}
       </button>
@@ -834,7 +845,7 @@ function CallButton({
         type="button"
         disabled={phase !== "idle"}
         onClick={() => void listenAndSubmit().catch((err) => setNote(err instanceof Error ? err.message : "voice failed"))}
-        className="rounded-md border border-neutral-200 px-3 py-1.5 text-xs disabled:opacity-40"
+        className="rounded px-3 py-1.5 text-xs font-semibold text-[#305eff] disabled:opacity-40"
       >
         Reply
       </button>
@@ -904,18 +915,18 @@ declare global {
 
 function HaltedList({ feed }: { feed: DeskEvent[] }) {
   return (
-    <div className="mt-8 rounded-xl border border-neutral-200 bg-white p-5">
-      <h2 className="text-base font-medium">Stopped on purpose</h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+    <div className="mt-8 desk-card p-5">
+      <h2 className="font-display text-lg tracking-tight">Stopped on purpose</h2>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-ink/55">
         Disputes, already-paid claims and stop-texting-me get neither a debit nor a message. Calendar T+3 still hammers
         them. Revoked mandates are not here — they keep their NPCI slots and get a re-auth ask instead.
       </p>
       {feed.length === 0 ? (
         <p className="mt-8 text-sm text-neutral-400">Terminal cases collect here as the night runs.</p>
       ) : (
-        <ul className="mt-6 divide-y divide-neutral-100">
+        <ul className="mt-6 divide-y divide-ink/5">
           {feed.map((row) => (
-            <li key={row.caseId} className="py-3">
+            <li key={row.caseId} className="rise-in py-3">
               <p className="text-sm">
                 {row.name}{" "}
                 <span className="text-neutral-400">
@@ -933,10 +944,10 @@ function HaltedList({ feed }: { feed: DeskEvent[] }) {
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="bg-white p-4">
-      <p className="text-[11px] text-neutral-400">{label}</p>
-      <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-neutral-400">{hint}</p>
+    <div className="rise-in desk-card p-4">
+      <p className="text-[11px] uppercase tracking-[0.12em] text-ink/40">{label}</p>
+      <p className="mt-2 font-display text-3xl tracking-tight tabular-nums">{value}</p>
+      <p className="mt-1 text-xs text-ink/45">{hint}</p>
     </div>
   );
 }
@@ -951,8 +962,8 @@ function badge(e: DeskEvent): string {
 
 function tone(e: DeskEvent): string {
   if (e.stopped) return "text-neutral-400";
-  if (e.recovered) return "text-emerald-700";
-  return "text-orange-700";
+  if (e.recovered) return "text-moss";
+  return "text-rust";
 }
 
 /** NPCI allows 1 original debit plus 3 retries. This column is what we spent of it. */
@@ -972,11 +983,11 @@ function seatFor(id: string, byId: Record<string, DeskEvent>, hotId: string | nu
 
 function seatClass(seat: Seat, live: boolean): string {
   const ring = live ? "ring-1 ring-neutral-900" : "";
-  if (seat === "hot") return `bg-amber-400 desk-pulse ${ring}`;
-  if (seat === "recovered") return `bg-emerald-600 ${ring}`;
-  if (seat === "stopped") return `bg-neutral-300 ${ring}`;
-  if (seat === "parked") return `bg-amber-500 ${ring}`;
-  return `bg-neutral-200 ${ring}`;
+  if (seat === "hot") return `bg-[#305eff] desk-pulse ${ring}`;
+  if (seat === "recovered") return `bg-moss ${ring}`;
+  if (seat === "stopped") return `bg-[#c5d0de] ${ring}`;
+  if (seat === "parked") return `bg-[#f5a623] ${ring}`;
+  return `bg-[#e4ebf3] ${ring}`;
 }
 
 function mixCounts(queue: QueueItem[], byId: Record<string, DeskEvent>): { key: string; n: number }[] {

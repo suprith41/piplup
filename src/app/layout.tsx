@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import { IBM_Plex_Mono, Mulish } from "next/font/google";
 import "./globals.css";
 
-const sans = IBM_Plex_Sans({
+const sans = Mulish({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
 });
 
@@ -22,7 +22,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={`${sans.variable} ${mono.variable} font-sans antialiased`}>{children}</body>
+      <head>
+        <link
+          href="https://api.fontshare.com/v2/css?f[]=tasa-orbiter@400,500,600,700&display=swap"
+          rel="stylesheet"
+        />
+      </head>
+      <body className={`${sans.variable} ${mono.variable} bg-white font-sans text-[#02042b] antialiased`}>{children}</body>
     </html>
   );
 }

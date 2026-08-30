@@ -10,13 +10,14 @@ export default function LabPage() {
   const report = evaluateBatch();
 
   return (
-    <main className="min-h-screen bg-[#f7f7f5] text-neutral-900">
+    <main className="min-h-screen bg-white text-[#02042b]">
+      <div className="bg-[#072654] px-6 py-1.5 text-center text-[11px] font-semibold text-white">TEST MODE</div>
       <div className="mx-auto max-w-5xl px-6 py-10">
       <p className="text-xs text-neutral-400">Internal</p>
-      <h1 className="mt-1 text-2xl font-semibold tracking-tight">Piplup lab</h1>
+      <h1 className="mt-1 font-display text-3xl tracking-tight">Piplup lab</h1>
       <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
         Scorecard and manual Razorpay/mail controls. The product is the{" "}
-        <Link className="underline decoration-neutral-300" href="/">
+        <Link className="font-semibold text-[#305eff]" href="/">
           Eureka Labs revenue desk
         </Link>
         .
@@ -39,7 +40,7 @@ export default function LabPage() {
 
 function Stat({ k, v }: { k: string; v: string }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4">
+    <div className="desk-card p-4">
       <dt className="text-[11px] text-neutral-400">{k}</dt>
       <dd className="mt-1 text-xl font-semibold tracking-tight">{v}</dd>
     </div>

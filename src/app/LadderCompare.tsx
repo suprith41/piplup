@@ -47,7 +47,7 @@ export function LadderCompare({ cases, adaptive, baseline }: Props) {
 
       <div className="mt-6 space-y-6">
         {picks.map(({ i, blurb }) => (
-          <article key={cases[i].id} className="overflow-hidden rounded-xl border border-neutral-200 bg-white">
+          <article key={cases[i].id} className="desk-card overflow-hidden">
             <header className="px-5 py-4">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h3 className="text-sm font-medium">
@@ -87,7 +87,7 @@ function Plan({ title, attempt, accent = false }: { title: string; attempt: Atte
           <Step key={n} step={step} />
         ))}
       </ol>
-      <p className={`mt-4 text-xs ${attempt.recovered ? (accent ? "text-emerald-700" : "text-neutral-500") : "text-neutral-400"}`}>
+      <p className={`mt-4 text-xs ${attempt.recovered ? (accent ? "text-moss" : "text-ink/50") : "text-ink/40"}`}>
         {attempt.recovered ? "Recovered." : "Not recovered."} {attempt.note}
       </p>
     </div>

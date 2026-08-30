@@ -1,22 +1,68 @@
+@import url("https://api.fontshare.com/v2/css?f[]=tasa-orbiter@400,500,600,700&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: light;
+  --paper: #ffffff;
+  --ink: #02042b;
+  --muted: #4f566b;
+  --rust: #e5533c;
+  --moss: #0d9f6e;
+  --rzp: #305eff;
+  --navy: #072654;
+  --line: #e6e9ee;
+  --soft: #f6f7f9;
 }
 
-html {
-  background: #f7f7f5;
+html,
+body {
+  background: #ffffff;
+  color: #02042b;
 }
 
 body {
   min-height: 100vh;
-  color: #171717;
+  font-family: var(--font-sans), "Mulish", sans-serif;
 }
 
 .mono {
-  font-family: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.font-display {
+  font-family: "TASA Orbiter", var(--font-sans), "Mulish", sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.desk-card {
+  background: #ffffff;
+  border: 1px solid #e6e9ee;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(2, 4, 43, 0.04);
+}
+
+.rzp-btn {
+  background: #305eff;
+  color: #ffffff;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.rzp-btn:disabled {
+  opacity: 0.4;
+}
+
+.rzp-btn-ghost {
+  background: #ffffff;
+  color: #02042b;
+  border: 1px solid #d6dbe3;
+  border-radius: 4px;
+  font-size: 14px;
 }
 
 @keyframes desk-pulse {
@@ -40,6 +86,59 @@ body {
   }
 }
 
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bar-rise {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes bar-widen {
+  from {
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+  to {
+    transform: scaleX(1);
+    transform-origin: left center;
+  }
+}
+
+@keyframes line-draw {
+  from {
+    stroke-dasharray: 8 4;
+    opacity: 0;
+  }
+  to {
+    stroke-dasharray: 2 0;
+    opacity: 1;
+  }
+}
+
+@keyframes dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .desk-pulse {
   animation: desk-pulse 1.4s ease-in-out infinite;
 }
@@ -48,11 +147,24 @@ body {
   animation: desk-in 0.22s ease-out;
 }
 
+.rise-in {
+  animation: rise-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .desk-scroll::-webkit-scrollbar {
   width: 8px;
 }
 
 .desk-scroll::-webkit-scrollbar-thumb {
-  background: #d4d4d0;
+  background: #d6dbe3;
   border-radius: 99px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .desk-pulse,
+  .desk-in,
+  .rise-in,
+  .origin-bottom {
+    animation: none !important;
+  }
 }
