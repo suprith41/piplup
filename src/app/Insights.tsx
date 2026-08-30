@@ -211,7 +211,7 @@ export function AnalyticsBoard() {
         >
           <div className="px-4 pb-4 pt-2">
             <Legend keys={STAGE_KEYS} extra="Recovery rate" />
-            <StackedBars key={window} rows={stageRows} keys={STAGE_KEYS} overlayLabel="Recovery rate" />
+            <StackedBars rows={stageRows} keys={STAGE_KEYS} overlayLabel="Recovery rate" />
           </div>
         </Panel>
 
@@ -249,7 +249,7 @@ export function AnalyticsBoard() {
       >
         <div className="px-4 pb-4 pt-2">
           <Legend keys={METHOD_KEYS} />
-          <StackedBars key={`m-${window}`} rows={methodRows} keys={METHOD_KEYS} />
+          <StackedBars rows={methodRows} keys={METHOD_KEYS} />
           <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
             {byMethod
               .filter((row) => row.key !== "none")

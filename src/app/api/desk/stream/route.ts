@@ -9,10 +9,9 @@ function sleep(ms: number): Promise<void> {
 }
 
 function pace(index: number): number {
-  if (index < 3) return 720;
-  if (index < 10) return 280;
-  if (index < 24) return 90;
-  return 28;
+  if (index < 3) return 640;
+  if (index < 8) return 280;
+  return 120;
 }
 
 export async function GET(request: Request) {

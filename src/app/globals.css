@@ -21,6 +21,7 @@ html,
 body {
   background: #ffffff;
   color: #02042b;
+  overflow-anchor: none;
 }
 
 body {
@@ -144,11 +145,15 @@ body {
 }
 
 .desk-in {
-  animation: desk-in 0.22s ease-out;
+  animation: desk-in 0.22s ease-out both;
 }
 
 .rise-in {
   animation: rise-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.desk-scroll {
+  overflow-anchor: none;
 }
 
 .desk-scroll::-webkit-scrollbar {

@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export function prefersReducedMotion(): boolean {
   return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-/** Counts to a target. Integers stay integers; money stays money. */
+/** Counts from the last shown value to a target. Never snaps back to 0 mid-stream. */
 export function useCountUp(target: number, ms = 880): number {
   const [value, setValue] = useState(0);
+  const from = useRef(0);
 
   useEffect(() => {
-    if (prefersReducedMotion() || target === 0) {
+    const origin = from.current;
+    if (prefersReducedMotion() || target === origin) {
+      from.current = target;
       setValue(target);
       return;
     }
@@ -20,8 +23,9 @@ export function useCountUp(target: number, ms = 880): number {
     const tick = (now: number) => {
       const p = Math.min(1, (now - start) / ms);
       const eased = 1 - (1 - p) ** 3;
-      setValue(target * eased);
+      setValue(origin + (target - origin) * eased);
       if (p < 1) frame = requestAnimationFrame(tick);
+      else from.current = target;
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnalyticsBoard, PreventBoard } from "@/app/Insights";
 import type { DeskEvent, IngressEvent, QueueItem } from "@/lib/autopilot/types";
 import { DEMO_INBOXES } from "@/lib/email/recipients";
@@ -10,6 +10,63 @@ import { formatINR } from "@/lib/recovery/taxonomy";
 
 type Tab = "desk" | "students" | "promises" | "halted" | "analytics" | "prevent";
 type Seat = "pending" | "hot" | "recovered" | "parked" | "stopped";
+
+const NIGHT_SNAP = "piplup-desk-night";
+
+type NightSnap = {
+  tape: string;
+  cursor: number;
+  total: number;
+  ingress: IngressEvent[];
+  feed: DeskEvent[];
+  byId: Record<string, DeskEvent>;
+  done: boolean;
+};
+
+let memoryNight: NightSnap | null = null;
+
+function readStore(): string | null {
+  try {
+    return localStorage.getItem(NIGHT_SNAP) ?? sessionStorage.getItem(NIGHT_SNAP);
+  } catch {
+    return null;
+  }
+}
+
+function loadNight(): NightSnap | null {
+  if (memoryNight) return memoryNight;
+  try {
+    const raw = readStore();
+    memoryNight = raw ? (JSON.parse(raw) as NightSnap) : null;
+    return memoryNight;
+  } catch {
+    return null;
+  }
+}
+
+function saveNight(snap: NightSnap) {
+  memoryNight = snap;
+  const raw = JSON.stringify(snap);
+  try {
+    localStorage.setItem(NIGHT_SNAP, raw);
+  } catch {
+    try {
+      sessionStorage.setItem(NIGHT_SNAP, raw);
+    } catch {
+      /* quota */
+    }
+  }
+}
+
+function clearNight() {
+  memoryNight = null;
+  try {
+    localStorage.removeItem(NIGHT_SNAP);
+    sessionStorage.removeItem(NIGHT_SNAP);
+  } catch {
+    /* private mode */
+  }
+}
 
 type Boot = {
   merchant: typeof EUREKA;
@@ -31,6 +88,19 @@ type Boot = {
 export function Desk() {
   const [boot, setBoot] = useState<Boot | null>(null);
   const [tab, setTab] = useState<Tab>("desk");
+  const [seen, setSeen] = useState<Record<Tab, boolean>>({
+    desk: true,
+    students: false,
+    promises: false,
+    halted: false,
+    analytics: false,
+    prevent: false,
+  });
+
+  function openTab(next: Tab) {
+    setTab(next);
+    setSeen((prev) => (prev[next] ? prev : { ...prev, [next]: true }));
+  }
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -44,8 +114,40 @@ export function Desk() {
   const [error, setError] = useState<string | null>(null);
   const [mailing, setMailing] = useState(false);
   const [mailNote, setMailNote] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
   const abort = useRef<AbortController | null>(null);
   const started = useRef(false);
+  const restored = useRef(false);
+  const pending = useRef<StreamMessage[]>([]);
+  const raf = useRef(0);
+  const snapshot = useRef<NightSnap>({
+    tape: "Razorpay has not posted tonight yet.",
+    cursor: 0,
+    total: 0,
+    ingress: [],
+    feed: [],
+    byId: {},
+    done: false,
+  });
+
+  useLayoutEffect(() => {
+    const snap = loadNight();
+    if (snap && snap.feed.length > 0) {
+      restored.current = true;
+      started.current = true;
+      snapshot.current = snap;
+      saveNight(snap);
+      setTape(snap.tape);
+      setCursor(snap.cursor);
+      setTotal(snap.total);
+      setIngress(snap.ingress);
+      setFeed(snap.feed);
+      setById(snap.byId);
+      setDone(snap.done);
+      setRunning(false);
+    }
+    setReady(true);
+  }, []);
 
   useEffect(() => {
     void fetch("/api/desk")
@@ -106,52 +208,73 @@ export function Desk() {
   }, []);
 
   useEffect(() => {
-    if (!boot) return;
-    const timer = window.setTimeout(() => {
-      if (started.current) return;
-      started.current = true;
-      void runNight();
-    }, 80);
-    return () => window.clearTimeout(timer);
+    if (!ready || !boot || restored.current || started.current) return;
+    started.current = true;
+    void runNight();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boot]);
+  }, [ready, boot]);
 
   useEffect(() => {
-    return () => abort.current?.abort();
+    return () => {
+      abort.current?.abort();
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
   }, []);
+
+  function persist(partial: Partial<NightSnap>) {
+    snapshot.current = { ...snapshot.current, ...partial };
+    if (partial.done || (partial.cursor ?? 0) % 8 === 0) {
+      saveNight(snapshot.current);
+    }
+  }
 
   function applyMessage(payload: StreamMessage) {
     if (payload.type === "hello") {
+      const tape = `${payload.merchant} · ${payload.cycle} · ${payload.operator} has the desk. ${payload.cases} AutoPays incoming.`;
       setTotal(payload.cases);
-      setTape(
-        `${payload.merchant} · ${payload.cycle} · ${payload.operator} has the desk. ${payload.cases} AutoPays incoming.`,
-      );
+      setTape(tape);
+      persist({ total: payload.cases, tape });
       return;
     }
     if (payload.type === "ingress") {
       setHotId(payload.caseId);
-      setIngress((prev) => [payload, ...prev].slice(0, 40));
-      setTape(
-        payload.live
-          ? `${payload.name} just failed on a live rail. Piplup is talking to Razorpay.`
-          : `${payload.name} · ${payload.decline.replaceAll("_", " ")} · ${payload.course}`,
-      );
+      setIngress((prev) => {
+        const next = [payload, ...prev].slice(0, 40);
+        persist({ ingress: next });
+        return next;
+      });
+      if (payload.live) {
+        const tape = `${payload.name} just failed on a live rail. Piplup is talking to Razorpay.`;
+        setTape(tape);
+        persist({ tape });
+      }
       return;
     }
     if (payload.type === "decision") {
       const event = payload.event;
-      setFeed((prev) => [event, ...prev]);
-      setById((prev) => ({ ...prev, [event.caseId]: event }));
+      const tape = `${event.name} · ${event.action}`;
+      setFeed((prev) => {
+        const next = [event, ...prev];
+        persist({ feed: next, cursor: payload.index, total: payload.total, tape });
+        return next;
+      });
+      setById((prev) => {
+        const next = { ...prev, [event.caseId]: event };
+        persist({ byId: next });
+        return next;
+      });
       setCursor(payload.index);
       setTotal(payload.total);
       setHotId(null);
-      setTape(`${event.name} · ${event.action}`);
+      setTape(tape);
       return;
     }
     if (payload.type === "done") {
       setRunning(false);
       setDone(true);
       setHotId(null);
+      persist({ done: true });
+      saveNight({ ...snapshot.current, done: true });
       return;
     }
     if (payload.type === "error") {
@@ -160,10 +283,34 @@ export function Desk() {
     }
   }
 
+  function queueMessage(payload: StreamMessage) {
+    pending.current.push(payload);
+    if (raf.current) return;
+    raf.current = requestAnimationFrame(() => {
+      raf.current = 0;
+      const batch = pending.current;
+      pending.current = [];
+      for (const item of batch) applyMessage(item);
+    });
+  }
+
   async function runNight() {
     abort.current?.abort();
     const controller = new AbortController();
     abort.current = controller;
+    pending.current = [];
+    if (raf.current) cancelAnimationFrame(raf.current);
+    raf.current = 0;
+    clearNight();
+    snapshot.current = {
+      tape: "Listening for Razorpay. Failures will land on this desk.",
+      cursor: 0,
+      total: 0,
+      ingress: [],
+      feed: [],
+      byId: {},
+      done: false,
+    };
 
     setRunning(true);
     setDone(false);
@@ -195,10 +342,10 @@ export function Desk() {
         for (const part of parts) {
           const line = part.split("\n").find((row) => row.startsWith("data: "));
           if (!line) continue;
-          applyMessage(JSON.parse(line.slice(6)) as StreamMessage);
+          queueMessage(JSON.parse(line.slice(6)) as StreamMessage);
         }
       }
-      setRunning(false);
+      if (!controller.signal.aborted) setRunning(false);
     } catch (err) {
       if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "autopilot stopped");
@@ -210,7 +357,10 @@ export function Desk() {
     abort.current?.abort();
     abort.current = null;
     setRunning(false);
-    setTape("Ada paused the night. Queue is frozen where it is.");
+    const tape = "Ada paused the night. Queue is frozen where it is.";
+    setTape(tape);
+    persist({ tape, done: true });
+    saveNight({ ...snapshot.current, tape, done: true });
   }
 
   async function sendEmails() {
@@ -277,22 +427,22 @@ export function Desk() {
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 px-3">
-          <NavBtn active={tab === "desk"} onClick={() => setTab("desk")}>
+          <NavBtn active={tab === "desk"} onClick={() => openTab("desk")}>
             Desk
           </NavBtn>
-          <NavBtn active={tab === "students"} onClick={() => setTab("students")}>
+          <NavBtn active={tab === "students"} onClick={() => openTab("students")}>
             Students
           </NavBtn>
-          <NavBtn active={tab === "promises"} onClick={() => setTab("promises")}>
+          <NavBtn active={tab === "promises"} onClick={() => openTab("promises")}>
             Promises
           </NavBtn>
-          <NavBtn active={tab === "halted"} onClick={() => setTab("halted")}>
+          <NavBtn active={tab === "halted"} onClick={() => openTab("halted")}>
             Stopped{stopped ? ` · ${stopped}` : ""}
           </NavBtn>
-          <NavBtn active={tab === "analytics"} onClick={() => setTab("analytics")}>
+          <NavBtn active={tab === "analytics"} onClick={() => openTab("analytics")}>
             Analytics
           </NavBtn>
-          <NavBtn active={tab === "prevent"} onClick={() => setTab("prevent")}>
+          <NavBtn active={tab === "prevent"} onClick={() => openTab("prevent")}>
             Prevent
           </NavBtn>
         </nav>
@@ -331,6 +481,7 @@ export function Desk() {
                 type="button"
                 disabled={!boot}
                 onClick={() => {
+                  restored.current = false;
                   started.current = true;
                   void runNight();
                 }}
@@ -383,8 +534,16 @@ export function Desk() {
         {tab === "students" ? <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} /> : null}
         {tab === "promises" ? <PromisesBoard queue={boot?.queue ?? []} byId={byId} /> : null}
         {tab === "halted" ? <HaltedList feed={feed.filter((e) => e.stopped)} /> : null}
-        {tab === "analytics" ? <AnalyticsBoard /> : null}
-        {tab === "prevent" ? <PreventBoard /> : null}
+        {seen.analytics ? (
+          <div hidden={tab !== "analytics"}>
+            <AnalyticsBoard />
+          </div>
+        ) : null}
+        {seen.prevent ? (
+          <div hidden={tab !== "prevent"}>
+            <PreventBoard />
+          </div>
+        ) : null}
         {error ? <p className="mt-4 text-sm text-[#e5533c]">{error}</p> : null}
         </main>
       </div>
@@ -459,8 +618,8 @@ function DeskFloor(props: {
 
   return (
     <div className="mt-8 space-y-8">
-      <section>
-        <p key={tape} className="desk-in max-w-2xl font-display text-[32px] leading-10 text-[#02042b]">
+      <section className="min-h-[88px]">
+        <p className="line-clamp-2 max-w-2xl font-display text-[32px] leading-10 text-[#02042b]">
           {tape}
         </p>
         <p className="mt-2 text-sm text-ink/50">
@@ -497,7 +656,7 @@ function DeskFloor(props: {
       <section className="grid gap-4 xl:grid-cols-2">
         <Tape title="Incoming" caption="Razorpay" empty="Waiting for the first failed AutoPay.">
           {ingress.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="desk-in border-t border-ink/5 px-4 py-3 first:border-t-0">
+            <li key={`${row.caseId}-${row.at}`} className="border-t border-ink/5 px-4 py-3 first:border-t-0">
               <p className="text-xs text-ink/40">
                 {row.source}
                 {row.live ? " · live" : ""}
@@ -513,7 +672,7 @@ function DeskFloor(props: {
         </Tape>
         <Tape title="Piplup" caption="Decisions" empty="Decisions land here.">
           {feed.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="desk-in border-t border-ink/5 px-4 py-3 first:border-t-0">
+            <li key={`${row.caseId}-${row.at}`} className="border-t border-ink/5 px-4 py-3 first:border-t-0">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm">
                   {row.name} <span className="text-neutral-400">{row.amount}</span>
@@ -570,7 +729,7 @@ function LiveCard({
   onVoiceNote: (note: string) => void;
 }) {
   return (
-    <article className={`desk-card p-4 ${hot ? "ring-2 ring-[#305eff]" : ""}`}>
+    <article className={`desk-card p-4 transition-shadow duration-200 ${hot ? "shadow-[0_0_0_1px_#305eff]" : ""}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="text-[11px] uppercase tracking-wide text-moss">Live</p>
@@ -926,7 +1085,7 @@ function HaltedList({ feed }: { feed: DeskEvent[] }) {
       ) : (
         <ul className="mt-6 divide-y divide-ink/5">
           {feed.map((row) => (
-            <li key={row.caseId} className="rise-in py-3">
+            <li key={row.caseId} className="py-3">
               <p className="text-sm">
                 {row.name}{" "}
                 <span className="text-neutral-400">
@@ -944,7 +1103,7 @@ function HaltedList({ feed }: { feed: DeskEvent[] }) {
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rise-in desk-card p-4">
+    <div className="desk-card p-4">
       <p className="text-[11px] uppercase tracking-[0.12em] text-ink/40">{label}</p>
       <p className="mt-2 font-display text-3xl tracking-tight tabular-nums">{value}</p>
       <p className="mt-1 text-xs text-ink/45">{hint}</p>
@@ -983,7 +1142,7 @@ function seatFor(id: string, byId: Record<string, DeskEvent>, hotId: string | nu
 
 function seatClass(seat: Seat, live: boolean): string {
   const ring = live ? "ring-1 ring-neutral-900" : "";
-  if (seat === "hot") return `bg-[#305eff] desk-pulse ${ring}`;
+  if (seat === "hot") return `bg-[#305eff] ${ring}`;
   if (seat === "recovered") return `bg-moss ${ring}`;
   if (seat === "stopped") return `bg-[#c5d0de] ${ring}`;
   if (seat === "parked") return `bg-[#f5a623] ${ring}`;
