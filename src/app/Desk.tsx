@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AnalyticsBoard, PreventBoard } from "@/app/Insights";
 import type { DeskEvent, IngressEvent, QueueItem } from "@/lib/autopilot/types";
 import { DEMO_INBOXES } from "@/lib/email/recipients";
 import { EUREKA } from "@/lib/merchant/eureka";
 import { formatINR } from "@/lib/recovery/taxonomy";
 
-type Tab = "desk" | "students" | "promises" | "halted";
+type Tab = "desk" | "students" | "promises" | "halted" | "analytics" | "prevent";
 type Seat = "pending" | "hot" | "recovered" | "parked" | "stopped";
 
 type Boot = {
@@ -287,6 +288,12 @@ export function Desk() {
               <NavBtn active={tab === "halted"} onClick={() => setTab("halted")}>
                 Stopped{stopped ? ` ${stopped}` : ""}
               </NavBtn>
+              <NavBtn active={tab === "analytics"} onClick={() => setTab("analytics")}>
+                Analytics
+              </NavBtn>
+              <NavBtn active={tab === "prevent"} onClick={() => setTab("prevent")}>
+                Prevent
+              </NavBtn>
             </nav>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -366,6 +373,8 @@ export function Desk() {
         {tab === "students" ? <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} /> : null}
         {tab === "promises" ? <PromisesBoard queue={boot?.queue ?? []} byId={byId} /> : null}
         {tab === "halted" ? <HaltedList feed={feed.filter((e) => e.stopped)} /> : null}
+        {tab === "analytics" ? <AnalyticsBoard /> : null}
+        {tab === "prevent" ? <PreventBoard /> : null}
         {error ? <p className="mt-4 text-sm text-orange-700">{error}</p> : null}
       </main>
     </div>

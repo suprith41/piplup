@@ -1,7 +1,11 @@
+import { recoveryAnalytics } from "../src/lib/recovery/analytics.ts";
 import { evaluateBatch } from "../src/lib/recovery/evaluate.ts";
+import { preventionSummary } from "../src/lib/recovery/prevent.ts";
 import { formatINR } from "../src/lib/recovery/taxonomy.ts";
 
 const report = evaluateBatch();
+const analytics = recoveryAnalytics(report);
+const prevention = preventionSummary();
 
 console.log("\nPiplup  ·  Adaptive Recovery vs the calendar retry cycle\n");
 console.log(`cases              ${report.adaptive.cases}`);
@@ -41,6 +45,42 @@ console.log(`  +${inr(report.delta.netAdvantage)} net of chase cost`);
 console.log(`  ${report.delta.retriesSaved} fewer NPCI debits`);
 console.log(`  ${report.delta.slotsSaved} NPCI slots saved`);
 console.log(`  ${report.delta.churnAvoided} recoverable subscriptions kept alive`);
+
+console.log(`\nRecovery analytics  ·  as of day ${analytics.asOfDay} of the cycle`);
+console.log(
+  `  failure rate ${pct(analytics.kpis.failureRate)} of ${analytics.kpis.cycleSubscriptions} subscriptions · recovery rate ${pct(analytics.kpis.recoveryRate)} by volume`,
+);
+console.log(
+  `  ${analytics.kpis.paisePerRupeeRecovered.toFixed(2)} paise spent per rupee recovered · ${analytics.kpis.contactsSent} customer contacts · ${analytics.kpis.humanReviewCases} routed to a human`,
+);
+console.log(
+  `  NPCI budget used ${analytics.kpis.npciSlotsSpent}/${analytics.kpis.npciSlotsAvailable} (${pct(analytics.kpis.slotUtilisation)})`,
+);
+console.log(
+  `  recovered ${inr(analytics.stages.recoveredRupees)} · in recovery ${inr(analytics.stages.inRecoveryRupees)} · not recovered ${inr(analytics.stages.notRecoveredRupees)}`,
+);
+
+console.log("\n  Recovered volume by method");
+for (const row of analytics.byMethod) {
+  console.log(
+    `    ${row.label.padEnd(24)} ${String(row.cases).padStart(3)} cases  ${inr(row.recoveredRupees).padStart(10)}  ${String(row.npciSlots).padStart(3)} slots`,
+  );
+}
+
+console.log("\n  Failed volume by decline reason");
+for (const row of analytics.byDecline) {
+  console.log(
+    `    ${row.label.padEnd(24)} ${String(row.cases).padStart(3)} cases  ${inr(row.atRiskRupees).padStart(10)}  ${pct(row.recoveryRate).padStart(4)} recovered`,
+  );
+}
+
+console.log("\nPrevention  ·  next cycle, scanned before anything is charged");
+console.log(`  ${prevention.scanned} upcoming debits scanned, ${prevention.flagged} flagged`);
+console.log(`  ${prevention.certain} will fail on arithmetic, not on a guess: ${inr(prevention.protectedRupees)}`);
+console.log(`  ${prevention.elevated} will fail next cycle unless the card is replaced`);
+console.log(
+  `  ${inr(prevention.spendRupees)} of notices, 0 NPCI slots, ${prevention.npciSlotsAvoided} slots the calendar would burn rediscovering it`,
+);
 console.log("");
 
 function liftBlock(label: string, lift: { adaptiveOnly: number; incrementalRupees: number; baselineOnly: number; regressionRupees: number; bothRecovered: number; neitherRecovered: number }): void {

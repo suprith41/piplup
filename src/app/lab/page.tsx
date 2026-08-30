@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LadderCompare } from "@/app/LadderCompare";
 import { RecoverLive } from "@/app/RecoverLive";
 import { evaluateBatch } from "@/lib/recovery/evaluate";
 import { formatINR } from "@/lib/recovery/taxonomy";
@@ -25,6 +26,11 @@ export default function LabPage() {
         <Stat k="Incremental lift" v={formatINR(Math.round(report.lift.incrementalRupees * 100))} />
         <Stat k="T+3 recovered" v={formatINR(Math.round(report.baseline.rupeesRecovered * 100))} />
       </dl>
+      <LadderCompare
+        cases={report.cases}
+        adaptive={report.adaptive.attempts}
+        baseline={report.baseline.attempts}
+      />
       <RecoverLive />
       </div>
     </main>

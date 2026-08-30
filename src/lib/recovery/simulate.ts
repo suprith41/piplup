@@ -1,5 +1,5 @@
 import { grantT3 } from "./baseline.ts";
-import { adaptiveCostPaise, T3_COST_PER_FAILED_RETRY_PAISE } from "./cost.ts";
+import { buildCalendarLadder, buildLadder } from "./ladder.ts";
 import { grantAdaptive, spendsNpciSlot } from "./policy.ts";
 import { rupees } from "./taxonomy.ts";
 import type {
@@ -57,19 +57,24 @@ function simulateAdaptive(c: RecoveryCase): AttemptResult {
   const decision = grantAdaptive(c);
 
   if (!decision.allowed) {
+    const ladder = buildLadder(c, decision, false);
     return {
       decision,
       executed: false,
       recovered: false,
       retriesUsed: 0,
       slotWasted: false,
-      costPaise: adaptiveCostPaise(decision),
+      costPaise: ladder.spentPaise,
       endedSubscriptionState: resolveEndState(c, false),
+      ladder: ladder.steps,
+      contactsUsed: ladder.contactsUsed,
+      needsHumanReview: false,
       note: mustNotDebit(c) ? "Correct stop. Slot saved." : "Stopped; no recovery path taken.",
     };
   }
 
   const recovered = succeeds(c, decision.mutation, decision.scheduledDay);
+  const ladder = buildLadder(c, decision, recovered);
   return {
     decision,
     executed: true,
@@ -77,8 +82,11 @@ function simulateAdaptive(c: RecoveryCase): AttemptResult {
     retriesUsed: decision.npciSlotsUsed,
     // Adaptive only ever presents a debit on a mandate that can still take one.
     slotWasted: decision.npciSlotsUsed > 0 && mustNotDebit(c),
-    costPaise: adaptiveCostPaise(decision),
+    costPaise: ladder.spentPaise,
     endedSubscriptionState: resolveEndState(c, recovered),
+    ladder: ladder.steps,
+    contactsUsed: ladder.contactsUsed,
+    needsHumanReview: ladder.needsHumanReview,
     note: adaptiveNote(decision.mutation, recovered),
   };
 }
@@ -103,6 +111,9 @@ function simulateT3(c: RecoveryCase, policy: PolicyName): AttemptResult {
       slotWasted: false,
       costPaise: 0,
       endedSubscriptionState: resolveEndState(c, false),
+      ladder: [],
+      contactsUsed: 0,
+      needsHumanReview: false,
       note: "Uncollected invoices left sitting. The calendar flow never charges them.",
     };
   }
@@ -128,15 +139,21 @@ function simulateT3(c: RecoveryCase, policy: PolicyName): AttemptResult {
     failedShots += 1;
   }
 
+  const ladder = buildCalendarLadder(c, recovered ? failedShots + 1 : shots, failedShots);
+
   return {
     decision,
     executed: true,
     recovered,
-    retriesUsed: recovered ? 1 : shots,
+    // Every morning it presented a debit, including the one that finally cleared.
+    retriesUsed: recovered ? failedShots + 1 : shots,
     slotWasted,
-    costPaise: failedShots * T3_COST_PER_FAILED_RETRY_PAISE,
+    costPaise: ladder.spentPaise,
     // Exhausting the cycle is exactly what moves a subscription to halted.
     endedSubscriptionState: resolveEndState(c, recovered),
+    ladder: ladder.steps,
+    contactsUsed: ladder.contactsUsed,
+    needsHumanReview: false,
     note: slotWasted
       ? stopsEarly
         ? "Stopped after one hard decline."

@@ -7,6 +7,12 @@ export const EUREKA = {
   operatorRole: "Head of Revenue",
   cohort: "September 2026",
   cycle: "Cycle 47",
+  /**
+   * Subscriptions billed this cycle. The recovery batch is the slice that
+   * failed, so this is the denominator behind the failure rate. Fixture value:
+   * Eureka Labs is a demo merchant.
+   */
+  cycleSubscriptions: 1240,
 } as const;
 
 const COURSES = [

@@ -1,6 +1,6 @@
 import type { Bank, DeclineClass, Rail, RecoveryCase } from "./types.ts";
 
-const NAMES = [
+export const NAMES = [
   "Jensen Huang",
   "James Walker",
   "Mark Zuckerberg",

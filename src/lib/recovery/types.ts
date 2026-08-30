@@ -156,16 +156,33 @@ export interface PolicyDecision {
   npciSlotsLeftAfter: number;
 }
 
+/** One rung of the bounded workflow: what we do, when, on which channel, at what price. */
+export interface LadderStep {
+  day: number;
+  hourIST: number;
+  action: "silent_retry" | "notice" | "nudge" | "debit" | "link" | "reauth" | "sweep" | "final_notice" | "stop";
+  channel: "silent" | "npci" | "whatsapp" | "sms" | "email" | "notice";
+  costPaise: number;
+  npciSlotsUsed: number;
+  /** Planned but not run, because the money already landed or a guardrail blocked it. */
+  skipped: boolean;
+  note: string;
+}
+
 export interface AttemptResult {
   decision: PolicyDecision;
   executed: boolean;
   recovered: boolean;
   retriesUsed: number;
   slotWasted: boolean;
-  /** What it cost us to chase this case: messages, notices, outreach. */
+  /** What it cost us to chase this case: the executed steps of the ladder below. */
   costPaise: number;
   /** Where the subscription lands once this policy is done with it. */
   endedSubscriptionState: SubscriptionState;
+  /** The bounded workflow this attempt ran, including the steps it skipped. */
+  ladder: LadderStep[];
+  contactsUsed: number;
+  needsHumanReview: boolean;
   note: string;
 }
 

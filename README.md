@@ -41,6 +41,33 @@ That is Stripe’s published shape (more recovery, fewer attempts), implemented 
 | **Bank downtime is not one thing** | A slow switch clears if you hold ~8s and re-present the same rail; the backup rail is behind the same bank and is just as slow. Core banking being down is the reverse. The seed labels both, so a policy that always cascades loses the first group and one that always waits loses the second. |
 | **RBI and domestic-card rules** | A debit moved to a new date needs a fresh 24h pre-debit notice, which can push the debit a day later. Indian domestic cards cannot be manually charged at all, so those cases only ever get a customer-completed link. |
 
+## The bounded workflow
+
+A policy decides once. A workflow runs for days and has to know when to stop.
+
+Every case gets an explicit ladder — day, hour, action, channel, price — generated from the grant and shown on `/lab` next to the calendar's ladder for the same customer. Guardrails are part of the object, not a promise in a README: contact only at 10:00 IST, quiet hours 21:00–09:00, at most 3 outbound messages per cycle, and a hard stop with a date on it.
+
+The ladder is also the **cost model**. Both policies are priced off the steps they actually ran, so the outreach spend in the scoreboard is the sum of the steps you can read on screen. Steps the ladder planned and never sent — because the money landed on step one — are greyed out and cost nothing. There is no second source of truth to reconcile.
+
+## Recovery analytics
+
+Stripe publishes a [recovery dashboard](https://docs.stripe.com/billing/revenue-recovery/recovery-analytics); the **Analytics** tab is that dashboard on Indian rails. Failure rate, recovery rate by volume, and the recovered / **in recovery** / not-recovered split, where "in recovery" is money whose next scheduled action has not come round yet — counting it as lost would flatter the recovery rate, counting it as won would be a lie.
+
+Two things Stripe reports differently and two it does not report at all:
+
+- **Recovered volume by method.** Stripe buckets this three ways (retries, emails, other). Ours splits into the six moves the policy can actually make, each with the NPCI slots it consumed. Half the recovered volume comes from methods that spend **zero** slots.
+- **Failed volume by decline reason**, with the recovery rate per reason, so a policy that is good at timeouts and bad at revoked mandates cannot hide behind an average.
+- **By sponsor bank** — not a Stripe concept, but the one that matters when a bank's core banking system decides your Tuesday.
+- **Cost of the chase**, in paise spent per rupee recovered. Nobody publishes this, because gross recovery reads better.
+
+## Prevention: the debit that never fails
+
+Stripe emails a customer a month before their card expires. India has no card account updater, so the same idea has to work harder — and it turns out it can work with certainty rather than prediction.
+
+A UPI AutoPay mandate is approved **up to a ceiling**. If this cycle's invoice is larger than that ceiling, the debit *cannot* clear. That is arithmetic, not a model. Same for a mandate or card that lapses before the billing date. The **Prevent** tab scans next cycle's book before anything is charged and flags every debit that is already guaranteed to fail, three days out, for the price of a WhatsApp message and zero NPCI slots.
+
+The calendar finds these on the billing day and then spends its entire retry budget rediscovering that one number is bigger than another.
+
 ## Prior art
 
 Failed-payment recovery is an established category. This project does not claim to invent it.
@@ -60,7 +87,8 @@ Piplup ships the measurement instead of the claim:
 1. **A reproducible A/B harness.** One command runs the same 112 labeled cases through a calendar T+3 baseline and through Adaptive Recovery, and prints both. Clone it and verify the numbers yourself.
 2. **Incremental lift, not gross recovery.** Cases the calendar would have won anyway do not count as ours. The harness reports adaptive-only wins, cases neither policy could save, and regressions where the baseline beat us.
 3. **Net of chase cost.** Every message, notice and retry has a price. Gross recovery ignores it; we subtract it. Calendar retries look cheap until you count the failure emails they trigger.
-4. **Refusal as a reported metric.** Recovery tools sell upside. None of them report the money they correctly *declined* to chase, even though burning NPCI retry slots on revoked mandates is the real failure mode. Here, a correct refusal scores as a win — and it is scored as *"spent no NPCI slot on a case that must not be debited"*, not as "did nothing", because refusing the debit and refusing the customer are different decisions.
+4. **Recovery that happens before the failure.** Every product on that list starts working after a debit has already failed and a slot is already gone. The prevention scan works the cycle before, on failures that are arithmetically certain rather than predicted.
+5. **Refusal as a reported metric.** Recovery tools sell upside. None of them report the money they correctly *declined* to chase, even though burning NPCI retry slots on revoked mandates is the real failure mode. Here, a correct refusal scores as a win — and it is scored as *"spent no NPCI slot on a case that must not be debited"*, not as "did nothing", because refusing the debit and refusing the customer are different decisions.
 
 ## Baseline assumptions
 
