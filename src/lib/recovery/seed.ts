@@ -27,6 +27,12 @@ function name(i: number): string {
   return NAMES[i % NAMES.length];
 }
 
+export function customerNameFor(id: string): string {
+  const n = Number(id.replace(/^rc_/, ""));
+  if (!Number.isFinite(n) || n < 1) return id;
+  return NAMES[(n - 1) % NAMES.length];
+}
+
 function amount(i: number): number {
   const slabs = [19900, 29900, 49900, 79900, 99900, 149900];
   return slabs[i % slabs.length];

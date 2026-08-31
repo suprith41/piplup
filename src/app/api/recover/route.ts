@@ -1,12 +1,15 @@
 import { readAudit } from "@/lib/razorpay/audit";
 import { describeLiveLinks, executeDemo, executeGrantedLinks, executeRecovery } from "@/lib/razorpay/executor";
 import { applyPaymentLinkPaid } from "@/lib/razorpay/webhooks";
+import { customerNameFor } from "@/lib/recovery/seed";
 
 export const dynamic = "force-dynamic";
 
 export function GET() {
   return Response.json({
-    audit: readAudit().slice(-24),
+    audit: readAudit()
+      .slice(-24)
+      .map((row) => ({ ...row, name: customerNameFor(row.caseId) })),
     live: describeLiveLinks(),
   });
 }

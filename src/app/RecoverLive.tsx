@@ -16,6 +16,7 @@ type Status = {
 type Row = {
   at: string;
   caseId: string;
+  name?: string;
   mutation: string;
   granted: boolean;
   reason: string;
@@ -28,6 +29,7 @@ type LedgerLine = {
   at: string;
   kind: string;
   caseId: string;
+  name?: string;
   mutation: string;
   outcome: string;
   reason: string;
@@ -385,8 +387,9 @@ export function RecoverLive() {
             {ledger.slice(0, 16).map((row, i) => (
               <li key={`${row.at}-${row.kind}-${i}`} className="border-t border-ink/5 pt-2">
                 <p className="mono text-[11px] uppercase tracking-wider text-ink/40">
-                  {row.kind} · {row.outcome} · {row.caseId}
+                  {row.kind} · {row.outcome} · {row.name ?? row.caseId}
                 </p>
+                <p className="mt-0.5 text-xs text-ink/45">{row.caseId}</p>
                 <p className="mt-1 text-ink/70">{row.reason}</p>
                 {row.transcript ? <p className="mt-1 text-xs italic text-ink/50">“{row.transcript}”</p> : null}
                 {row.linkUrl ? (
@@ -410,8 +413,9 @@ export function RecoverLive() {
             .map((row, i) => (
               <li key={`${row.at}-${i}`} className="border-t border-ink/5 pt-2">
                 <p className="mono text-[11px] uppercase tracking-wider text-ink/40">
-                  {row.outcome} · {row.caseId} · {row.mutation}
+                  {row.outcome} · {row.name ?? row.caseId} · {row.mutation}
                 </p>
+                <p className="mt-0.5 text-xs text-ink/45">{row.caseId}</p>
                 <p className="mt-1 text-ink/70">{row.reason}</p>
                 {row.link ? (
                   <a className="mt-1 inline-block text-moss underline" href={row.link.shortUrl} target="_blank" rel="noreferrer">
