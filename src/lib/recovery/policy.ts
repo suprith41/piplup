@@ -1,8 +1,37 @@
 import { bankSignalFor, classifyDecline, isContactFrozen, isRevokedMandate } from "./taxonomy.ts";
-import type { Clock, Mutation, PolicyDecision, RecoveryCase } from "./types.ts";
+import type {
+  Clock,
+  Mutation,
+  PolicyDecision,
+  RecoveryCase,
+  RetryEnvelope,
+  ScheduledAttempt,
+  TimingExplanation,
+} from "./types.ts";
+import { bestContactDay, DEFAULT_ENVELOPE, MIN_CLEAR_PROBABILITY, planWindows } from "./windows.ts";
 
 /** NPCI allows 1 original debit plus 3 retries on a mandate. That is the whole budget. */
 export const NPCI_MAX_ATTEMPTS = 4;
+
+/**
+ * The merchant owns the boundary; the model owns everything inside it.
+ *
+ * Stripe lets a business set the drop-dead day and the max attempts and then
+ * scores the retry times itself. The same split, except NPCI already fixed our
+ * ceiling: whatever the merchant asks for, a mandate gets 1 original debit plus
+ * 3 retries and no more.
+ */
+export function envelopeFor(c: RecoveryCase, override?: Partial<RetryEnvelope>): RetryEnvelope {
+  const merchant = { ...DEFAULT_ENVELOPE, ...override };
+  return {
+    dropDeadDay: Math.min(Math.max(merchant.dropDeadDay, c.billingDay), 28),
+    maxAttempts: Math.max(
+      0,
+      Math.min(merchant.maxAttempts, NPCI_MAX_ATTEMPTS - 1, Math.max(0, c.retryBudgetLeft)),
+    ),
+    finalAction: merchant.finalAction,
+  };
+}
 
 /** A slow switch clears in seconds. Long enough to matter, short enough to stay in-session. */
 export const MICRO_COOLDOWN_SECONDS = 8;
@@ -36,8 +65,9 @@ export function spendsNpciSlot(mutation: Mutation): boolean {
  *
  * Anything that is neither recoverable nor contactable falls through to a stop.
  */
-export function grantAdaptive(c: RecoveryCase): PolicyDecision {
+export function grantAdaptive(c: RecoveryCase, override?: Partial<RetryEnvelope>): PolicyDecision {
   const inferredClass = classifyDecline(c);
+  const envelope = envelopeFor(c, override);
 
   if (c.optedOut) {
     return stop(c, inferredClass, "Customer opted out. Contact freeze.");
@@ -88,7 +118,7 @@ export function grantAdaptive(c: RecoveryCase): PolicyDecision {
       inferredClass,
       clock: "async_dunning",
       mutation,
-      scheduledDay: c.promiseToPayDay ?? c.billingDay,
+      scheduledDay: bestContactDay(c, envelope),
       reason: c.promiseToPayDay
         ? `Dead instrument. Customer promised day ${c.promiseToPayDay}. Hold the recovery link until then.`
         : "Dead or stale instrument. Mutate the instrument — do not replay the same mandate.",
@@ -100,7 +130,7 @@ export function grantAdaptive(c: RecoveryCase): PolicyDecision {
       inferredClass,
       clock: "async_dunning",
       mutation: "payment_link",
-      scheduledDay: c.promiseToPayDay ?? c.billingDay,
+      scheduledDay: bestContactDay(c, envelope),
       reason: c.promiseToPayDay
         ? `Checkout dropped. Customer promised day ${c.promiseToPayDay}. Do not chase before then.`
         : "Checkout dropped after instrument select. Send a one-time recovery link, do not auto-debit.",
@@ -108,7 +138,6 @@ export function grantAdaptive(c: RecoveryCase): PolicyDecision {
   }
 
   // financial
-  const scheduledDay = pickLiquidityDay(c);
 
   // Razorpay does not permit manual charge on an Indian domestic card, so the
   // only compliant path is a link the customer completes themselves.
@@ -117,8 +146,26 @@ export function grantAdaptive(c: RecoveryCase): PolicyDecision {
       inferredClass,
       clock: "async_dunning",
       mutation: "payment_link",
-      scheduledDay,
+      scheduledDay: bestContactDay(c, envelope),
       reason: "Domestic card: manual charge is not supported. Recovery has to go through a customer-completed link.",
+    });
+  }
+
+  // Score every hour of every day inside the envelope and take the best slot,
+  // rather than reading one signal and adding a fixed offset to the due date.
+  const plan = planWindows(c, envelope);
+  const first = plan.chosen[0];
+
+  if (!first) {
+    // Nothing in the window clears the floor, so the slot is worth more unspent.
+    return allow(c, {
+      inferredClass,
+      clock: "async_dunning",
+      mutation: "payment_link",
+      scheduledDay: bestContactDay(c, envelope),
+      reason: `No window in the next ${envelope.dropDeadDay - c.billingDay} days scores above the ${Math.round(
+        MIN_CLEAR_PROBABILITY * 100,
+      )}% floor, so the NPCI slot stays unspent and the customer gets a link instead.`,
     });
   }
 
@@ -126,12 +173,30 @@ export function grantAdaptive(c: RecoveryCase): PolicyDecision {
     inferredClass,
     clock: "async_dunning",
     mutation: "same_rail_retry",
-    scheduledDay,
-    reason:
-      scheduledDay === c.billingDay
-        ? "Financial decline with no salary/promise signal. One delayed same-rail shot only."
-        : `Financial decline. Wait for liquidity on day ${scheduledDay}, do not T+1 hammer.`,
+    scheduledDay: first.day,
+    scheduledHourIST: first.hourIST,
+    attempts: plan.chosen,
+    timing: plan.explanation,
+    reason: timingReason(c, plan.chosen),
   });
+}
+
+function clockTime(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function timingReason(c: RecoveryCase, chosen: ScheduledAttempt[]): string {
+  const first = chosen[0];
+  const when =
+    first.day === c.billingDay
+      ? `the billing day itself at ${clockTime(first.hourIST)} IST`
+      : `day ${first.day} at ${clockTime(first.hourIST)} IST`;
+  const odds = `${Math.round(first.probability * 100)}%`;
+  const backup =
+    chosen.length > 1
+      ? ` One held in reserve for day ${chosen[1].day} at ${clockTime(chosen[1].hourIST)}.`
+      : "";
+  return `Financial decline. Best-scoring window is ${when} at ${odds}, not T+1.${backup}`;
 }
 
 /**
@@ -159,13 +224,6 @@ function cascade(c: RecoveryCase, inferredClass: PolicyDecision["inferredClass"]
   });
 }
 
-function pickLiquidityDay(c: RecoveryCase): number {
-  if (c.promiseToPayDay) return c.promiseToPayDay;
-  if (c.liquidity?.instrumentSucceededElsewhere && c.liquidity.atDay) return c.liquidity.atDay;
-  if (c.salaryDay) return c.salaryDay;
-  return Math.min(c.billingDay + 4, 28);
-}
-
 /**
  * RBI requires the customer to be notified 24h before an auto-debit.
  * The original billing-day attempt was already covered by its notice.
@@ -189,6 +247,9 @@ interface Grant {
   clock: Clock;
   mutation: Mutation;
   scheduledDay: number;
+  scheduledHourIST?: number;
+  attempts?: ScheduledAttempt[];
+  timing?: TimingExplanation;
   reason: string;
   cooldownSeconds?: number;
 }
@@ -196,6 +257,7 @@ interface Grant {
 function allow(c: RecoveryCase, grant: Grant): PolicyDecision {
   let { clock, mutation, reason } = grant;
   let cooldownSeconds = grant.cooldownSeconds;
+  let attempts = grant.attempts;
   const slotsLeft = Math.max(0, c.retryBudgetLeft);
 
   // The budget guard does not stop recovery, it changes the instrument. A
@@ -204,11 +266,21 @@ function allow(c: RecoveryCase, grant: Grant): PolicyDecision {
     clock = "async_dunning";
     mutation = "payment_link";
     cooldownSeconds = undefined;
+    attempts = undefined;
     reason = `NPCI budget spent (1 original + 3 retries). No slot left to debit, so recovery moves out of band to a link. ${reason}`;
   }
 
-  const slotsUsed = spendsNpciSlot(mutation) ? 1 : 0;
   const compliance = applyPreDebitNotice(c, mutation, grant.scheduledDay);
+
+  // A notice that moves the first debit moves the ones behind it by the same days.
+  const shift = compliance.scheduledDay - grant.scheduledDay;
+  if (attempts && shift !== 0) {
+    attempts = attempts.map((a) => ({ ...a, day: a.day + shift }));
+  }
+
+  // One slot per planned debit. A cooldown or a cascade only ever presents once.
+  const planned = attempts?.length ?? 1;
+  const slotsUsed = spendsNpciSlot(mutation) ? Math.min(planned, slotsLeft) : 0;
 
   return {
     caseId: c.id,
@@ -221,6 +293,9 @@ function allow(c: RecoveryCase, grant: Grant): PolicyDecision {
       : reason,
     allowed: true,
     scheduledDay: compliance.scheduledDay,
+    scheduledHourIST: attempts?.[0]?.hourIST ?? grant.scheduledHourIST,
+    attempts,
+    timing: grant.timing,
     preDebitNoticeDay: compliance.preDebitNoticeDay,
     cooldownSeconds,
     npciSlotsUsed: slotsUsed,

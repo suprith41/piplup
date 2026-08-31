@@ -66,6 +66,24 @@ export interface LiquiditySignal {
   atDay?: number;
 }
 
+/**
+ * How much of the retry cycle the merchant is willing to fund.
+ *
+ * Stripe lets a business set the drop-dead day, the max attempts and the final
+ * action, and lets the model choose every retry time inside that boundary. The
+ * same split works here, except the ceiling is not ours to pick: NPCI caps a
+ * mandate at 1 original debit plus 3 retries, so `maxAttempts` can only ever
+ * lower that, never raise it.
+ */
+export interface RetryEnvelope {
+  /** Last day of the cycle we are allowed to present a debit on. */
+  dropDeadDay: number;
+  /** Debits this policy may schedule. Clamped to what NPCI and the mandate allow. */
+  maxAttempts: number;
+  /** What happens to the subscription when the window closes unpaid. */
+  finalAction: "halt" | "link" | "keep_open";
+}
+
 /** What an inbound customer message means, once parsed into something typed. */
 export type ReplyIntent =
   | "promise_to_pay"
@@ -105,7 +123,16 @@ export interface RecoveryCase {
   trueClass: DeclineClass;
   retryBudgetLeft: number;
   billingDay: number;
+  /** Declared payday, when the customer or the merchant record actually states one. */
   salaryDay?: number;
+  /**
+   * Days of the month this customer's debit cleared in previous cycles.
+   *
+   * Every subscription merchant already has this, and it is the one signal that
+   * survives when nobody declared a payday. The window model reads it; the
+   * priority cascade it replaced had no path to it at all.
+   */
+  priorClearedDays?: number[];
   promiseToPayDay?: number;
   liquidity?: LiquiditySignal;
   optedOut: boolean;
@@ -121,13 +148,27 @@ export interface RecoveryCase {
    * date needs a fresh notice.
    */
   preDebitNotifiedForDay?: number;
-  /** Simulator: which mutated attempts would actually clear. */
+  /**
+   * Ground truth. The simulator may read this; no policy ever may.
+   *
+   * `salaryDay` and `priorClearedDays` above are what the merchant can see.
+   * `liquidOnDay` / `liquidAtHourIST` are what is actually true, which is the
+   * only way to score a timing model honestly.
+   */
   willSucceedOn: {
     sameRailImmediate: boolean;
     /** Switch was slow, not down: the same rail clears after a few seconds. */
     sameRailAfterCooldown: boolean;
     nextRailImmediate: boolean;
+    /** Money does arrive eventually and a same-rail debit will take it. */
     sameRailOnSalaryDay: boolean;
+    /** Day of the month the money is actually in the account. */
+    liquidOnDay?: number;
+    /**
+     * Hour the credit posts on that day. A debit presented before it fails on
+     * the right day, which is how a nightly batch loses a payday.
+     */
+    liquidAtHourIST?: number;
     paymentLink: boolean;
     reauth: boolean;
     backCharge: boolean;
@@ -144,6 +185,15 @@ export interface PolicyDecision {
   allowed: boolean;
   stopReason?: string;
   scheduledDay?: number;
+  /**
+   * Hour of the scheduled debit, IST. A payday is not a time: present before
+   * the salary credit posts and the right day still fails.
+   */
+  scheduledHourIST?: number;
+  /** Every debit this grant schedules, best first. Empty for out-of-band mutations. */
+  attempts?: ScheduledAttempt[];
+  /** Model's probability for the chosen window, and why it won. */
+  timing?: TimingExplanation;
   /** Day we must send the RBI pre-debit notice, when the debit moves to a new date. */
   preDebitNoticeDay?: number;
   /** Seconds to hold before re-presenting, when the switch is slow rather than down. */
@@ -154,6 +204,55 @@ export interface PolicyDecision {
    */
   npciSlotsUsed: number;
   npciSlotsLeftAfter: number;
+}
+
+/**
+ * Stripe groups its 500+ retry features into five families. We have five
+ * signals, not five hundred, but the families are the same and every one of
+ * ours is a thing a Razorpay merchant genuinely holds.
+ */
+export type WindowCategory = "customer" | "merchant" | "payment" | "seasonality" | "rail";
+
+/** One term of the scored window, in log-odds, so the pick can be read back. */
+export interface WindowFactor {
+  category: WindowCategory;
+  label: string;
+  weight: number;
+}
+
+/** One candidate slot in the day × hour grid, scored. */
+export interface ScoredWindow {
+  day: number;
+  hourIST: number;
+  probability: number;
+  /**
+   * The summed log-odds behind `probability`. Once a payday has passed, every
+   * remaining window is somewhere above 95% and the differences that decide the
+   * pick only exist on this scale.
+   */
+  logOdds: number;
+  /** probability × exposure − what the attempt costs to run. */
+  evPaise: number;
+  factors: WindowFactor[];
+  /** Set when the window cannot be used at all: past drop-dead, quiet hours, no slot. */
+  blocked?: string;
+}
+
+export interface ScheduledAttempt {
+  day: number;
+  hourIST: number;
+  probability: number;
+  evPaise: number;
+}
+
+export interface TimingExplanation {
+  /** Windows scored before picking. */
+  considered: number;
+  /** Windows the expected-value gate refused to spend a slot on. */
+  refusedOnEv: number;
+  chosen: ScheduledAttempt[];
+  factors: WindowFactor[];
+  envelope: RetryEnvelope;
 }
 
 /** One rung of the bounded workflow: what we do, when, on which channel, at what price. */

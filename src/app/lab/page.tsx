@@ -1,13 +1,18 @@
 import Link from "next/link";
 import { LadderCompare } from "@/app/LadderCompare";
 import { RecoverLive } from "@/app/RecoverLive";
+import { TimingModel } from "@/app/TimingModel";
+import { sweepEnvelopes } from "@/lib/recovery/benchmark";
 import { evaluateBatch } from "@/lib/recovery/evaluate";
+import { CALENDAR_PRESENT_HOUR } from "@/lib/recovery/simulate";
 import { formatINR } from "@/lib/recovery/taxonomy";
+import { DEFAULT_ENVELOPE, planWindows } from "@/lib/recovery/windows";
 
 export const dynamic = "force-dynamic";
 
 export default function LabPage() {
   const report = evaluateBatch();
+  const timingPicks = pickTimingCases(report);
 
   return (
     <main className="min-h-screen bg-white text-[#02042b]">
@@ -27,6 +32,7 @@ export default function LabPage() {
         <Stat k="Incremental lift" v={formatINR(Math.round(report.lift.incrementalRupees * 100))} />
         <Stat k="T+3 recovered" v={formatINR(Math.round(report.baseline.rupeesRecovered * 100))} />
       </dl>
+      <TimingModel picks={timingPicks} sweep={sweepEnvelopes()} calendarHour={CALENDAR_PRESENT_HOUR} />
       <LadderCompare
         cases={report.cases}
         adaptive={report.adaptive.attempts}
@@ -36,6 +42,43 @@ export default function LabPage() {
       </div>
     </main>
   );
+}
+
+/**
+ * Two cases where the timing is the whole decision: one where nobody ever
+ * declared a payday and only the clearing history knows, and one where the
+ * money lands after the hour we picked, so the reserve window is what saves it.
+ */
+function pickTimingCases(report: ReturnType<typeof evaluateBatch>) {
+  const wanted: Array<{ blurb: string; match: (i: number) => boolean }> = [
+    {
+      blurb:
+        "Nobody ever told us when this customer gets paid. Three cycles of clearing history did, and a fixed offset from the due date has no way to read them.",
+      match: (i) => Boolean(report.cases[i].priorClearedDays?.length) && !report.cases[i].salaryDay,
+    },
+    {
+      blurb:
+        "Payroll here runs late in the evening, and no merchant-visible signal says so. The first window misses by hours, which is exactly what the reserve window is for.",
+      match: (i) => report.adaptive.attempts[i].retriesUsed > 1,
+    },
+  ];
+
+  const picks: Array<{
+    caseRow: (typeof report.cases)[number];
+    grid: ReturnType<typeof planWindows>;
+    blurb: string;
+  }> = [];
+
+  for (const { blurb, match } of wanted) {
+    const i = report.cases.findIndex(
+      (_, index) => match(index) && report.adaptive.attempts[index].decision.attempts?.length,
+    );
+    if (i === -1 || picks.some((p) => p.caseRow.id === report.cases[i].id)) continue;
+    const envelope = report.adaptive.attempts[i].decision.timing?.envelope ?? DEFAULT_ENVELOPE;
+    picks.push({ caseRow: report.cases[i], grid: planWindows(report.cases[i], envelope), blurb });
+  }
+
+  return picks;
 }
 
 function Stat({ k, v }: { k: string; v: string }) {

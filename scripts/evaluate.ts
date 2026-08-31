@@ -1,11 +1,15 @@
 import { recoveryAnalytics } from "../src/lib/recovery/analytics.ts";
+import { sweepEnvelopes } from "../src/lib/recovery/benchmark.ts";
 import { evaluateBatch } from "../src/lib/recovery/evaluate.ts";
 import { preventionSummary } from "../src/lib/recovery/prevent.ts";
+import { CALENDAR_PRESENT_HOUR } from "../src/lib/recovery/simulate.ts";
 import { formatINR } from "../src/lib/recovery/taxonomy.ts";
 
 const report = evaluateBatch();
 const analytics = recoveryAnalytics(report);
 const prevention = preventionSummary();
+const sweep = sweepEnvelopes();
+const timing = timingSummary();
 
 console.log("\nPiplup  ·  Adaptive Recovery vs the calendar retry cycle\n");
 console.log(`cases              ${report.adaptive.cases}`);
@@ -74,6 +78,38 @@ for (const row of analytics.byDecline) {
   );
 }
 
+console.log("\nWhen to present  ·  the window model, not a fixed offset");
+console.log(
+  `  ${timing.scored} windows scored across ${timing.cases} debit cases · ${timing.grid} slots per case`,
+);
+console.log(
+  `  chosen hour: ${timing.hours.map((h) => `${String(h.hour).padStart(2, "0")}:00 ×${h.cases}`).join("  ")}`,
+);
+console.log(
+  `  ${timing.movedOffBillingDay} debits moved off the billing date · ${timing.reserveUsed} needed the reserve window`,
+);
+console.log(
+  `  a calendar presents every one of them at 0${CALENDAR_PRESENT_HOUR}:00, before any salary credit posts`,
+);
+
+console.log("\nEnvelope benchmark  ·  what the drop-dead day is worth");
+console.log("        window   attempts   recovered        net   debits   churn");
+for (const row of sweep.results) {
+  const star =
+    row.dropDeadDay === sweep.recommended.dropDeadDay && row.maxAttempts === sweep.recommended.maxAttempts
+      ? " <- recommended"
+      : "";
+  console.log(
+    `      ${String(row.dropDeadDay).padStart(3)} days        x${row.maxAttempts}   ${inr(row.rupeesRecovered).padStart(9)}  ${inr(row.rupeesNet).padStart(9)}   ${String(row.npciDebits).padStart(6)}   ${String(row.involuntaryChurn).padStart(5)}${star}`,
+  );
+}
+console.log(
+  `  Shipped default is ${sweep.current.dropDeadDay} days × ${sweep.current.maxAttempts} attempts, ${
+    sweep.gapToBest === 0 ? "which is the best row on this book." : `${inr(sweep.gapToBest)} behind the best row.`
+  }`,
+);
+console.log("  A third attempt recovers nothing more and costs a slot, so NPCI decides the cap, not taste.");
+
 console.log("\nPrevention  ·  next cycle, scanned before anything is charged");
 console.log(`  ${prevention.scanned} upcoming debits scanned, ${prevention.flagged} flagged`);
 console.log(`  ${prevention.certain} will fail on arithmetic, not on a guess: ${inr(prevention.protectedRupees)}`);
@@ -92,6 +128,38 @@ function liftBlock(label: string, lift: { adaptiveOnly: number; incrementalRupee
 
 function row(label: string, naive: string | number, charitable: string | number, adaptive: string | number): void {
   console.log(`${label.padEnd(22)} ${pad(naive)} ${pad(charitable)} ${pad(adaptive)}`);
+}
+
+/** What the window model actually chose, read back off the decisions. */
+function timingSummary() {
+  const scheduled = report.adaptive.attempts.filter((a) => a.decision.timing);
+  const byHour = new Map<number, number>();
+  let scored = 0;
+  let reserveUsed = 0;
+  let movedOffBillingDay = 0;
+
+  for (const attempt of scheduled) {
+    const timing = attempt.decision.timing;
+    if (!timing) continue;
+    scored += timing.considered;
+    if (attempt.retriesUsed > 1) reserveUsed += 1;
+    const first = timing.chosen[0];
+    if (first) {
+      byHour.set(first.hourIST, (byHour.get(first.hourIST) ?? 0) + 1);
+      if (first.day > 1) movedOffBillingDay += 1;
+    }
+  }
+
+  return {
+    cases: scheduled.length,
+    scored,
+    grid: scheduled.length ? Math.round(scored / scheduled.length) : 0,
+    reserveUsed,
+    movedOffBillingDay,
+    hours: [...byHour.entries()]
+      .map(([hour, cases]) => ({ hour, cases }))
+      .sort((a, b) => b.cases - a.cases),
+  };
 }
 
 function pct(n: number): string {

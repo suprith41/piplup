@@ -162,6 +162,7 @@ export function deskEvent(
     promiseToPayDay: c.promiseToPayDay,
     claimedPaid: c.claimedPaid,
     scheduledDay: decision.scheduledDay,
+    scheduledHourIST: decision.scheduledHourIST,
     parsedIntent: c.parsedReply?.intent,
   };
 }
@@ -210,10 +211,15 @@ function actionLine(
       return "Asked the student to wake UPI AutoPay. Same mandate is dead.";
     case "back_charge_invoices":
       return "Swept invoices Razorpay left sitting after the subscription revived.";
-    case "same_rail_retry":
-      return decision.scheduledDay
-        ? `Parked until day ${decision.scheduledDay}. Liquidity comes back; spam does not.`
-        : "Retrying the same rail now.";
+    case "same_rail_retry": {
+      if (!decision.scheduledDay) return "Retrying the same rail now.";
+      const at =
+        decision.scheduledHourIST === undefined
+          ? `day ${decision.scheduledDay}`
+          : `day ${decision.scheduledDay}, ${String(decision.scheduledHourIST).padStart(2, "0")}:00`;
+      const held = (decision.attempts?.length ?? 1) > 1 ? " One window held in reserve." : "";
+      return `Best of ${decision.timing?.considered ?? 0} windows: ${at}, after the salary posts.${held}`;
+    }
     default:
       return decision.reason;
   }

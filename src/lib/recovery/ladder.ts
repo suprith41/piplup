@@ -37,6 +37,8 @@ interface Draft {
   action: LadderStep["action"];
   channel: LadderStep["channel"];
   note: string;
+  /** Set by the window model. Contact steps keep the fixed contact hour. */
+  hourIST?: number;
   /** Runs regardless of outcome. Anything else is skipped once the money is in. */
   always?: boolean;
 }
@@ -54,11 +56,22 @@ function isContact(channel: LadderStep["channel"]): boolean {
   return channel === "whatsapp" || channel === "sms" || channel === "email";
 }
 
-export function buildLadder(c: RecoveryCase, decision: PolicyDecision, recovered: boolean): Ladder {
+/**
+ * @param presented How many money-moving steps actually ran. A plan with two
+ * scored debit windows only settles on the one that cleared, so the first one
+ * still costs its slot when the second is the one that lands.
+ */
+export function buildLadder(
+  c: RecoveryCase,
+  decision: PolicyDecision,
+  recovered: boolean,
+  presented = 1,
+): Ladder {
   const drafts = draftsFor(c, decision);
   const steps: LadderStep[] = [];
 
   let contactsUsed = 0;
+  let moneyMoves = 0;
   let settled = false;
 
   for (const draft of drafts) {
@@ -68,7 +81,8 @@ export function buildLadder(c: RecoveryCase, decision: PolicyDecision, recovered
 
     steps.push({
       day: draft.day,
-      hourIST: draft.channel === "silent" || draft.channel === "npci" ? 0 : CONTACT_HOUR_IST,
+      hourIST:
+        draft.hourIST ?? (draft.channel === "silent" || draft.channel === "npci" ? 0 : CONTACT_HOUR_IST),
       action: draft.action,
       channel: draft.channel,
       costPaise: skipped ? 0 : COST[draft.channel],
@@ -78,8 +92,9 @@ export function buildLadder(c: RecoveryCase, decision: PolicyDecision, recovered
     });
 
     if (!skipped && isContact(draft.channel)) contactsUsed += 1;
-    // Everything after the money-moving step is contingent on it having failed.
-    if (!skipped && recovered && movesMoney(draft.action)) settled = true;
+    if (!skipped && movesMoney(draft.action)) moneyMoves += 1;
+    // Everything after the step that landed is contingent on it having failed.
+    if (recovered && moneyMoves >= presented) settled = true;
   }
 
   const stopStep = steps.find((s) => s.action === "stop");
@@ -244,11 +259,37 @@ function draftsFor(c: RecoveryCase, decision: PolicyDecision): Draft[] {
         always: true,
       });
     }
+
+    const windows = decision.attempts?.length
+      ? decision.attempts
+      : [{ day: start, hourIST: decision.scheduledHourIST ?? 0, probability: 0, evPaise: 0 }];
+    const last = windows[windows.length - 1];
+
+    steps.push({
+      day: windows[0].day,
+      action: "nudge",
+      channel: "whatsapp",
+      note: "Heads-up on the morning we debit, so it is not a surprise.",
+    });
+
+    windows.forEach((window, i) => {
+      const at = `day ${window.day} at ${String(window.hourIST).padStart(2, "0")}:00 IST`;
+      const odds = window.probability ? ` Model gives it ${Math.round(window.probability * 100)}%.` : "";
+      steps.push({
+        day: window.day,
+        hourIST: window.hourIST,
+        action: "debit",
+        channel: "npci",
+        note:
+          i === 0
+            ? `Best-scoring window: ${at}.${odds}`
+            : `Reserve window, held back unless the first one misses: ${at}.${odds}`,
+      });
+    });
+
     steps.push(
-      { day: start, action: "nudge", channel: "whatsapp", note: "Heads-up on the morning we debit, so it is not a surprise." },
-      { day: start, action: "debit", channel: "npci", note: "One debit, on the day the money is actually there." },
-      { day: start + 2, action: "final_notice", channel: "email", note: "Debit missed. Written notice, no second debit." },
-      { day: start + 4, action: "stop", channel: "silent", note: "Budget and patience both spent. Close the cycle." },
+      { day: last.day + 2, action: "final_notice", channel: "email", note: "Windows spent. Written notice, no further debit." },
+      { day: last.day + 4, action: "stop", channel: "silent", note: "Budget and patience both spent. Close the cycle." },
     );
     return steps;
   }

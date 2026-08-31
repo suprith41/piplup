@@ -7,7 +7,7 @@ Stripe-grade recovery intelligence on **Razorpay's Indian rails**, demoed as the
 - Type the decline first.
 - Mutate the next attempt. Do not replay the same debit.
 - Cascade *now* if the bank is down; hold a few seconds if the bank is merely slow.
-- Dunning *later* if it is money. Wait for salary day, not T+1.
+- Dunning *later* if it is money — and at the right **hour**, not just the right day. A payday debit presented in the 02:00 batch bounces against yesterday's balance.
 - Treat the **NPCI budget (1 original + 3 retries)** as the scarce resource. A revoked mandate gets a re-auth ask, not a retry.
 - Score it against a Razorpay-style **T+3 calendar** on the same 112 labeled cases.
 
@@ -40,6 +40,18 @@ That is Stripe’s published shape (more recovery, fewer attempts), implemented 
 | **NPCI caps mandate debits** at 1 original + 3 retries | Every decision carries `npciSlotsUsed`. Only same-rail retry, cooldown retry and rail cascade spend from it. A revoked mandate spends **zero** and gets a re-auth ask instead, because the debit is dead but the customer is not. Exhausting the budget downgrades to a link rather than ending recovery. |
 | **Bank downtime is not one thing** | A slow switch clears if you hold ~8s and re-present the same rail; the backup rail is behind the same bank and is just as slow. Core banking being down is the reverse. The seed labels both, so a policy that always cascades loses the first group and one that always waits loses the second. |
 | **RBI and domestic-card rules** | A debit moved to a new date needs a fresh 24h pre-debit notice, which can push the debit a day later. Indian domestic cards cannot be manually charged at all, so those cases only ever get a customer-completed link. |
+
+## When to present
+
+Stripe's [Smart Retries](https://stripe.com/blog/how-we-built-it-smart-retries) replaced a fixed dunning schedule with a model that scores candidate retry windows. We port the method, not the model — we have 112 labelled cases, not billions of payments, and say so.
+
+Every day × hour window inside the merchant's envelope gets scored additively in log-odds, so the pick can be read back off the decision instead of taken on trust. Signals sit in Stripe's five families and every one is something a Razorpay merchant already holds: declared payday, promise-to-pay parsed from the reply, the days this customer's debit cleared in previous cycles, the decline code's measured base rate, the rail, and the hour.
+
+The hour is the part that is specific to us. Indian payroll posts in the morning clearing batch, so a debit presented at 02:00 on payday is presented against yesterday's balance — the right date and the wrong time. A calendar cycle presents at 02:00 every time.
+
+The merchant sets the boundary and the model picks inside it, exactly as Stripe splits it — except NPCI already fixed the ceiling, so `maxAttempts` can only ever go lower than four. `npm run evaluate` sweeps 15 envelopes over the whole batch and ranks them; on this book the best is **14 days × 2 attempts**, the same two-week window Stripe recommends at a fraction of the attempts. A third attempt recovers nothing more and costs a slot.
+
+`/lab` renders the scored grid for two cases with the chosen windows ringed and the log-odds terms printed underneath.
 
 ## The bounded workflow
 
@@ -100,6 +112,8 @@ The comparison is only worth anything if the control is fair, so both readings a
 | `t3_hard_decline_aware` | Charitable reading: the cycle stops after one hard decline. |
 
 Reported lift has to survive both. If it only existed against the harsher reading, it would not be real.
+
+Two rules bind the baseline and us identically, because they are facts about the rails rather than policy choices. Razorpay does not permit a merchant-initiated charge on an Indian domestic card, so neither policy can debit one. And the calendar's failure emails carry a hosted card-change link, which is a real recovery channel — so it is credited whenever the money is there on the day the email goes out, on the same test our own links are scored on. Crediting only our links would be scoring our own exam; it is worth about ₹15k of the calendar's recovery on this batch.
 
 Involuntary churn counts only subscriptions that were **recoverable** and ended halted anyway. Halting a revoked mandate is correct behaviour, not churn, and both policies are scored with the same rule.
 

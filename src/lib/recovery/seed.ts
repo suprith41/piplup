@@ -42,6 +42,30 @@ function bank(i: number): Bank {
   return BANKS[i % BANKS.length];
 }
 
+/**
+ * Indian payroll, as it actually lands: a day and an hour.
+ *
+ * Large employers credit in the morning clearing batch on the 1st; SMEs run
+ * payroll late on the 10th. A retry cycle that presents at 02:00 is presented
+ * against the previous day's balance in every one of these cases.
+ */
+const PAYROLL = [
+  { day: 1, hour: 9 },
+  { day: 5, hour: 8 },
+  { day: 7, hour: 10 },
+  { day: 10, hour: 18 },
+] as const;
+
+/**
+ * Customers who never declared a payday but have a clearing history with us.
+ * `cleared` is what the merchant can see; `day` / `hour` are the truth.
+ */
+const CLEARING_HISTORY = [
+  { cleared: [11, 12, 12], day: 12, hour: 9 },
+  { cleared: [6, 7, 6], day: 7, hour: 11 },
+  { cleared: [3, 4, 3], day: 4, hour: 8 },
+] as const;
+
 function base(i: number, trueClass: DeclineClass, declineCode: string): RecoveryCase {
   const on = rail(i);
   return {
@@ -94,21 +118,46 @@ export function seedBatch(): RecoveryCase[] {
     cases.push(c);
   }
 
-  // 25 financial NSF — money appears on salary day 5. T+1..T+3 is too early.
-  // Promise dates are not handed over: they are parsed out of the reply.
-  for (let i = 25; i < 50; i += 1) {
+  // 13 financial NSF where a payday is on file. Four real Indian payroll
+  // patterns, and each one credits at its own hour — which is the whole point.
+  // Day 1 is the billing day: the debit ran at 02:00 and the salary posted at
+  // 09:00, so the case failed by seven hours, not by seven days. A cycle that
+  // only knows about days cannot see that, and re-presents tomorrow.
+  for (let i = 25; i < 38; i += 1) {
+    const pay = PAYROLL[i % PAYROLL.length];
     const c = base(i, "financial", "insufficient_funds");
-    c.salaryDay = 5;
+    c.salaryDay = pay.day;
     c.willSucceedOn.sameRailOnSalaryDay = true;
+    c.willSucceedOn.liquidOnDay = pay.day;
+    c.willSucceedOn.liquidAtHourIST = pay.hour;
+    // Domestic cards cannot be debited at all, so for half of these the link is
+    // the only channel. It converts once the money is there, and not before.
+    c.willSucceedOn.paymentLink = true;
+    // Promise dates are not handed over: they are parsed out of the reply.
     if (i % 5 === 0) {
-      c.customerReply = "I'm short right now, salary lands on the 5th then I'll pay";
+      c.customerReply = `I'm short right now, salary lands on the ${pay.day}th then I'll pay`;
     }
     if (i % 7 === 0) {
       c.customerReply = "I'll pay at month end";
     }
     if (i % 8 === 0) {
-      c.liquidity = { instrumentSucceededElsewhere: true, atDay: 5 };
+      c.liquidity = { instrumentSucceededElsewhere: true, atDay: pay.day };
     }
+    cases.push(c);
+  }
+
+  // 12 financial NSF where nobody ever declared a payday — the ordinary case.
+  // What the merchant does have is this customer's own history: the day their
+  // debit cleared in previous cycles. A fixed offset from the billing date
+  // fits one of these cohorts and misses the other two.
+  for (let i = 38; i < 50; i += 1) {
+    const seenBefore = CLEARING_HISTORY[i % CLEARING_HISTORY.length];
+    const c = base(i, "financial", "insufficient_funds");
+    c.priorClearedDays = [...seenBefore.cleared];
+    c.willSucceedOn.sameRailOnSalaryDay = true;
+    c.willSucceedOn.liquidOnDay = seenBefore.day;
+    c.willSucceedOn.liquidAtHourIST = seenBefore.hour;
+    c.willSucceedOn.paymentLink = true;
     cases.push(c);
   }
 

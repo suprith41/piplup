@@ -58,5 +58,6 @@ export type DeskEvent = {
   promiseToPayDay?: number;
   claimedPaid?: boolean;
   scheduledDay?: number;
+  scheduledHourIST?: number;
   parsedIntent?: string;
 };

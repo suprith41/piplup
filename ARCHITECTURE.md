@@ -9,6 +9,7 @@ decline event
     → hard policy grant
     → clock: sync cascade | async dunning | terminal mutation | stop
     → mutate attempt (cooldown / next rail / wait / link / reauth / none)
+    → score every window in the envelope, take the best day *and hour*
     → NPCI budget guard (1 original + 3 retries)
     → RBI pre-debit notice gate
     → bounded ladder (day / hour / channel / price, with a hard stop)
@@ -31,9 +32,54 @@ upcoming charge
 | Clock | When | Stripe analog | Piplup on Indian rails |
 | --- | --- | --- | --- |
 | Sync cascade | Bank-side technical decline | Adaptive Acceptance | Slow switch: hold 8s, re-present same rail. CBS down: cascade to another rail. Either way the customer sees nothing. |
-| Async dunning | Financial / instrument / checkout | Smart Retries | Wait for salary day, promise-to-pay, or a liquidity signal. Domestic card means a link, never a silent charge. |
+| Async dunning | Financial / instrument / checkout | Smart Retries | Score every day × hour window and present at the best one. Domestic card means a link, never a silent charge. |
 | Terminal mutation | Mandate revoked | — | The debit is over, the customer is not. Ask for a fresh AutoPay. **Costs zero NPCI slots.** |
 | Stop | Chargeback / opt-out / already paid | Excessive-retry prevention | No debit and no message. Counts as a correct decision. |
+
+## When to present: the window model
+
+Stripe's [Smart Retries writeup](https://stripe.com/blog/how-we-built-it-smart-retries) replaced a fixed dunning
+schedule with a model that scores candidate retry windows and picks the best. We cannot train on billions of
+payments and do not pretend to. What ports is the method:
+
+| Stripe | Piplup |
+| --- | --- |
+| Fixed schedule → learned timing | Score the whole day × hour grid, take the argmax |
+| 500+ features in five families | Five signals in the same five families, each one a thing a merchant already holds |
+| Heavy model, because a retry days out has no latency budget | Exhaustive search over 70 windows per case, for the same reason |
+| Retry until the budget runs out | Spend a slot only when expected value clears a floor |
+| Merchant sets the envelope, model picks inside it | Same, except NPCI already fixed the ceiling at 4 attempts |
+| Publish a benchmarked default | `sweepEnvelopes()` re-runs the batch under 15 envelopes and ranks them |
+
+[`windows.ts`](src/lib/recovery/windows.ts) scores each window additively in log-odds, so the pick can be read
+back rather than taken on trust. The base rate per decline code is measured on the labelled batch **leave-one-out**,
+so a case never contributes to its own prior. Everything else is Indian-rail mechanics we can state:
+
+- **Customer** — declared payday, promise-to-pay parsed from the reply, instrument seen clearing elsewhere, and the
+  days this customer's debit cleared in previous cycles. The cascade this replaced read the first of those that
+  matched and ignored the rest; the model adds all of them, which matters when a customer declares the 1st and has
+  cleared on the 7th three cycles running.
+- **Seasonality** — the hour. This is the load-bearing one. Indian payroll posts in the morning clearing batch, so a
+  debit presented at 02:00 on payday is presented against yesterday's balance. The calendar cycle presents at 02:00
+  every time, which is how a fixed schedule loses a payday it actually reached.
+- **Payment** — the measured base rate for the decline code.
+- **Rail** — UPI AutoPay presents 24×7; eNACH settles in batches.
+- **Merchant** — drift off the billing date, and exposure size.
+
+### The envelope
+
+The merchant owns the boundary and the model owns the interior. `dropDeadDay`, `maxAttempts` and `finalAction` are
+merchant settings; `envelopeFor()` then clamps `maxAttempts` against what NPCI and the mandate actually allow, so a
+merchant can ask for fewer attempts but never more.
+
+`npm run evaluate` prints the full sweep. On this book the best envelope is **14 days × 2 attempts** — the same
+two-week window Stripe recommends, at a fraction of the attempts, because NPCI grants four and Stripe's card rails
+grant eight. A third attempt recovers nothing more and costs a slot.
+
+### When the hour is unknowable
+
+No merchant-visible signal says that a customer's employer runs payroll at 18:00. The model does not guess it; it
+buys a second window instead. That is what `maxAttempts: 2` is for, and it is why the sweep prefers it over one.
 
 ## The NPCI budget guard
 

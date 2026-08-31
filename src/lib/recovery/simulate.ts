@@ -5,15 +5,28 @@ import { rupees } from "./taxonomy.ts";
 import type {
   AttemptResult,
   Mutation,
+  PolicyDecision,
   PolicyName,
   PolicyScore,
   RecoveryCase,
+  RetryEnvelope,
   SubscriptionState,
 } from "./types.ts";
 
-export function runPolicy(cases: RecoveryCase[], policy: PolicyName): PolicyScore {
+/**
+ * The hour a calendar retry cycle presents on: a nightly batch, before any
+ * salary credit has posted. It is not a strawman — it is what a fixed schedule
+ * with no timing model has to do.
+ */
+export const CALENDAR_PRESENT_HOUR = 2;
+
+export function runPolicy(
+  cases: RecoveryCase[],
+  policy: PolicyName,
+  envelope?: Partial<RetryEnvelope>,
+): PolicyScore {
   const attempts = cases.map((c) =>
-    policy === "adaptive" ? simulateAdaptive(c) : simulateT3(c, policy),
+    policy === "adaptive" ? simulateAdaptive(c, envelope) : simulateT3(c, policy),
   );
   return score(policy, cases, attempts);
 }
@@ -53,8 +66,8 @@ function mustNotDebit(c: RecoveryCase): boolean {
   return c.trueClass === "terminal" || c.optedOut || c.chargeback || c.claimedPaid;
 }
 
-function simulateAdaptive(c: RecoveryCase): AttemptResult {
-  const decision = grantAdaptive(c);
+function simulateAdaptive(c: RecoveryCase, envelope?: Partial<RetryEnvelope>): AttemptResult {
+  const decision = grantAdaptive(c, envelope);
 
   if (!decision.allowed) {
     const ladder = buildLadder(c, decision, false);
@@ -73,15 +86,18 @@ function simulateAdaptive(c: RecoveryCase): AttemptResult {
     };
   }
 
-  const recovered = succeeds(c, decision.mutation, decision.scheduledDay);
-  const ladder = buildLadder(c, decision, recovered);
+  const run = present(c, decision);
+  const recovered = run.recovered;
+  const ladder = buildLadder(c, decision, recovered, Math.max(1, run.slotsSpent));
   return {
     decision,
     executed: true,
     recovered,
-    retriesUsed: decision.npciSlotsUsed,
+    // What we actually presented, not what we planned: a second window is only
+    // spent when the first one missed.
+    retriesUsed: run.slotsSpent,
     // Adaptive only ever presents a debit on a mandate that can still take one.
-    slotWasted: decision.npciSlotsUsed > 0 && mustNotDebit(c),
+    slotWasted: run.slotsSpent > 0 && mustNotDebit(c),
     costPaise: ladder.spentPaise,
     endedSubscriptionState: resolveEndState(c, recovered),
     ladder: ladder.steps,
@@ -123,30 +139,40 @@ function simulateT3(c: RecoveryCase, policy: PolicyName): AttemptResult {
   const shots = stopsEarly ? 1 : Math.min(3, Math.max(1, c.retryBudgetLeft));
 
   let recovered = false;
+  let recoveredByLink = false;
   let slotWasted = false;
-  let failedShots = 0;
+  let debits = 0;
 
   for (let i = 1; i <= shots; i += 1) {
     const day = c.billingDay + i;
+    debits += 1;
     if (hardDecline) {
       slotWasted = true;
-      failedShots += 1;
       continue;
     }
-    if (c.willSucceedOn.sameRailImmediate) recovered = true;
-    if (c.salaryDay && day >= c.salaryDay && c.willSucceedOn.sameRailOnSalaryDay) recovered = true;
-    if (recovered) break;
-    failedShots += 1;
+    // Same rail, same mandate, same nightly batch hour, three mornings running.
+    if (debitClears(c, day, CALENDAR_PRESENT_HOUR)) {
+      recovered = true;
+      break;
+    }
+    // Each failure fires an email carrying a hosted card-change link. Crediting
+    // only our links and not the calendar's would be scoring our own exam.
+    if (linkConverts(c, day)) {
+      recovered = true;
+      recoveredByLink = true;
+      break;
+    }
   }
 
-  const ladder = buildCalendarLadder(c, recovered ? failedShots + 1 : shots, failedShots);
+  const failedShots = recovered && !recoveredByLink ? debits - 1 : debits;
+  const ladder = buildCalendarLadder(c, debits, failedShots);
 
   return {
     decision,
     executed: true,
     recovered,
     // Every morning it presented a debit, including the one that finally cleared.
-    retriesUsed: recovered ? failedShots + 1 : shots,
+    retriesUsed: debits,
     slotWasted,
     costPaise: ladder.spentPaise,
     // Exhausting the cycle is exactly what moves a subscription to halted.
@@ -158,9 +184,11 @@ function simulateT3(c: RecoveryCase, policy: PolicyName): AttemptResult {
       ? stopsEarly
         ? "Stopped after one hard decline."
         : `Burned ${shots} NPCI slot(s) on a terminal/opt-out case.`
-      : recovered
-        ? "Cleared on a calendar retry."
-        : "Retry cycle exhausted. Subscription halted.",
+      : recoveredByLink
+        ? "Debits all missed. The customer paid the failure email's link themselves."
+        : recovered
+          ? "Cleared on a calendar retry."
+          : "Retry cycle exhausted. Subscription halted.",
   };
 }
 
@@ -168,22 +196,86 @@ function isHardDecline(c: RecoveryCase): boolean {
   return c.trueClass === "terminal" || c.chargeback || c.optedOut || c.mandateState === "revoked";
 }
 
-function succeeds(c: RecoveryCase, mutation: Mutation, day?: number): boolean {
-  if (mutation === "cooldown_retry") return c.willSucceedOn.sameRailAfterCooldown;
-  if (mutation === "next_rail") return c.willSucceedOn.nextRailImmediate;
-  if (mutation === "payment_link") return c.willSucceedOn.paymentLink;
+/**
+ * Ground truth for one presentment.
+ *
+ * A payday is a day *and* an hour. Present at 02:00 on the morning the salary
+ * lands at 09:00 and the debit bounces against yesterday's balance — the right
+ * date and the wrong time. This is the only place that reads `liquidOnDay`;
+ * no policy is allowed anywhere near it.
+ */
+function debitClears(c: RecoveryCase, day: number, hourIST: number): boolean {
+  // Razorpay does not permit a merchant-initiated charge on an Indian domestic
+  // card. That is the platform's rule, not a policy choice, so it binds the
+  // baseline exactly as hard as it binds us.
+  if (c.domesticCard && c.rail === "card") return false;
+
+  if (c.willSucceedOn.sameRailImmediate) return true;
+  if (!c.willSucceedOn.sameRailOnSalaryDay) return false;
+
+  const liquidDay = c.willSucceedOn.liquidOnDay;
+  if (liquidDay === undefined) return false;
+  if (day > liquidDay) return true;
+  if (day < liquidDay) return false;
+  return hourIST >= (c.willSucceedOn.liquidAtHourIST ?? 0);
+}
+
+/**
+ * A link is a request, not a debit, but it is still timed.
+ *
+ * Half our volume can only ever be recovered by a link, because domestic cards
+ * cannot be charged. A link handed to someone whose account is empty is not a
+ * recovery channel, it is a notification — so the same liquidity date that
+ * gates a debit gates the link, and both policies are scored on it.
+ */
+function linkConverts(c: RecoveryCase, day: number): boolean {
+  if (!c.willSucceedOn.paymentLink) return false;
+  const liquidDay = c.willSucceedOn.liquidOnDay;
+  if (liquidDay === undefined) return true;
+  return day >= liquidDay;
+}
+
+function succeedsOutOfBand(c: RecoveryCase, mutation: Mutation, day: number): boolean {
+  if (mutation === "payment_link") return linkConverts(c, day);
   if (mutation === "mandate_reauth") return c.willSucceedOn.reauth;
   if (mutation === "back_charge_invoices") return c.willSucceedOn.backCharge;
-  if (mutation === "same_rail_retry") {
-    if (c.willSucceedOn.sameRailImmediate) return true;
-    if (day && c.salaryDay && day >= c.salaryDay) return c.willSucceedOn.sameRailOnSalaryDay;
-    if (day && c.promiseToPayDay && day >= c.promiseToPayDay) return c.willSucceedOn.sameRailOnSalaryDay;
-    if (c.liquidity?.instrumentSucceededElsewhere && day && c.liquidity.atDay && day >= c.liquidity.atDay) {
-      return c.willSucceedOn.sameRailOnSalaryDay;
-    }
-    return false;
-  }
   return false;
+}
+
+/** Present the scheduled debits in order and stop at the first one that clears. */
+function present(c: RecoveryCase, decision: PolicyDecision): { recovered: boolean; slotsSpent: number } {
+  if (!spendsNpciSlot(decision.mutation)) {
+    const day = decision.scheduledDay ?? c.billingDay;
+    return { recovered: succeedsOutOfBand(c, decision.mutation, day), slotsSpent: 0 };
+  }
+
+  const windows = decision.attempts?.length
+    ? decision.attempts
+    : [
+        {
+          day: decision.scheduledDay ?? c.billingDay,
+          hourIST: decision.scheduledHourIST ?? CALENDAR_PRESENT_HOUR,
+        },
+      ];
+
+  let slotsSpent = 0;
+  for (const window of windows) {
+    slotsSpent += 1;
+
+    // Both cascade moves happen inside the original attempt window, so the
+    // clock never advances and there is nothing for the hour to change.
+    if (decision.mutation === "cooldown_retry") {
+      if (c.willSucceedOn.sameRailAfterCooldown) return { recovered: true, slotsSpent };
+      continue;
+    }
+    if (decision.mutation === "next_rail") {
+      if (c.willSucceedOn.nextRailImmediate) return { recovered: true, slotsSpent };
+      continue;
+    }
+    if (debitClears(c, window.day, window.hourIST)) return { recovered: true, slotsSpent };
+  }
+
+  return { recovered: false, slotsSpent };
 }
 
 function score(policy: PolicyName, cases: RecoveryCase[], attempts: AttemptResult[]): PolicyScore {
