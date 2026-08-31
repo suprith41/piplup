@@ -1,8 +1,23 @@
 /**
  * Test-mode Razorpay only. Keys stay in .env.local — never in the client bundle.
- * Test accounts can issue at most 30 Payment Links, so we create them one case
- * at a time after the policy grant, not for the whole batch.
+ * Test accounts can issue at most 30 Payment Links. We mint only for cases the
+ * policy actually grants a link or re-auth to, and stop if Razorpay hits the cap.
  */
+
+export const TEST_MODE_LINK_CAP = 30;
+
+export function isLinkCapError(message: string | undefined): boolean {
+  if (!message) return false;
+  return /test mode limit|limit of \d+ reached|maximum number of payment links|only \d+ payment link/i.test(message);
+}
+
+function isRateLimitError(status: number, message: string | undefined): boolean {
+  return status === 429 || /too many requests/i.test(message ?? "");
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface CreatedLink {
   id: string;
@@ -41,47 +56,56 @@ export async function createPaymentLink(input: {
   const auth = Buffer.from(`${id}:${secret}`).toString("base64");
   const expireBy = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60;
 
-  const res = await fetch("https://api.razorpay.com/v1/payment_links", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${auth}`,
-      "Content-Type": "application/json",
+  const payload = {
+    amount: input.amountPaise,
+    currency: "INR",
+    accept_partial: false,
+    reference_id: input.referenceId.slice(0, 40),
+    description: input.description.slice(0, 2048),
+    customer: {
+      name: input.customerName,
+      email: `${input.referenceId.replace(/[^a-z0-9]/gi, "").slice(0, 20)}@piplup.test`,
     },
-    body: JSON.stringify({
-      amount: input.amountPaise,
-      currency: "INR",
-      accept_partial: false,
-      reference_id: input.referenceId.slice(0, 40),
-      description: input.description.slice(0, 2048),
-      customer: {
-        name: input.customerName,
-        email: `${input.referenceId.replace(/[^a-z0-9]/gi, "").slice(0, 20)}@piplup.test`,
-      },
-      notify: { sms: false, email: false },
-      reminder_enable: false,
-      expire_by: expireBy,
-      notes: input.notes,
-    }),
-  });
-
-  const body = (await res.json()) as {
-    id?: string;
-    short_url?: string;
-    amount?: number;
-    reference_id?: string;
-    status?: string;
-    error?: { description?: string; code?: string };
+    notify: { sms: false, email: false },
+    reminder_enable: false,
+    expire_by: expireBy,
+    notes: input.notes,
   };
 
-  if (!res.ok || !body.id || !body.short_url) {
-    throw new Error(body.error?.description ?? `Payment Link failed (${res.status})`);
+  let lastError = "Payment Link failed";
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const res = await fetch("https://api.razorpay.com/v1/payment_links", {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${auth}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const body = (await res.json()) as {
+      id?: string;
+      short_url?: string;
+      amount?: number;
+      reference_id?: string;
+      status?: string;
+      error?: { description?: string; code?: string };
+    };
+
+    if (res.ok && body.id && body.short_url) {
+      return {
+        id: body.id,
+        shortUrl: body.short_url,
+        amountPaise: body.amount ?? input.amountPaise,
+        referenceId: body.reference_id ?? input.referenceId,
+        status: body.status ?? "issued",
+      };
+    }
+
+    lastError = body.error?.description ?? `Payment Link failed (${res.status})`;
+    if (!isRateLimitError(res.status, lastError)) break;
+    await sleep(800 * (attempt + 1));
   }
 
-  return {
-    id: body.id,
-    shortUrl: body.short_url,
-    amountPaise: body.amount ?? input.amountPaise,
-    referenceId: body.reference_id ?? input.referenceId,
-    status: body.status ?? "issued",
-  };
+  throw new Error(lastError);
 }

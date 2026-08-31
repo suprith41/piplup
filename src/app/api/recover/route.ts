@@ -1,17 +1,21 @@
 import { readAudit } from "@/lib/razorpay/audit";
-import { executeDemo, executeRecovery } from "@/lib/razorpay/executor";
+import { describeLiveLinks, executeDemo, executeGrantedLinks, executeRecovery } from "@/lib/razorpay/executor";
 import { applyPaymentLinkPaid } from "@/lib/razorpay/webhooks";
 
 export const dynamic = "force-dynamic";
 
 export function GET() {
-  return Response.json({ audit: readAudit() });
+  return Response.json({
+    audit: readAudit().slice(-24),
+    live: describeLiveLinks(),
+  });
 }
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     caseId?: string;
     demo?: boolean;
+    granted?: boolean;
     injectTimeout?: boolean;
     markPaid?: boolean;
   };
@@ -25,6 +29,11 @@ export async function POST(request: Request) {
       return Response.json({ error: result.reason }, { status: 400 });
     }
     return Response.json({ paid: result });
+  }
+
+  if (body.granted) {
+    const result = await executeGrantedLinks({ injectTimeout: body.injectTimeout });
+    return Response.json(result);
   }
 
   if (body.demo) {

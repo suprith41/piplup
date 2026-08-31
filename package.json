@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "evaluate": "node --experimental-strip-types --experimental-transform-types scripts/evaluate.ts",
-    "recover:demo": "node --experimental-strip-types --experimental-transform-types scripts/recover-demo.ts"
+    "recover:demo": "node --experimental-strip-types --experimental-transform-types scripts/recover-demo.ts",
+    "recover:links": "node --experimental-strip-types --experimental-transform-types scripts/recover-demo.ts --all"
   },
   "dependencies": {
     "next": "^15.4.6",

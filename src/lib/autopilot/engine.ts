@@ -1,6 +1,7 @@
 import { DEMO_INBOXES } from "../email/recipients.ts";
 import { mailStatus, sendReminders } from "../email/send.ts";
 import { eurekaCourse, railLabel } from "../merchant/eureka.ts";
+import { findLink, liveLinks } from "../razorpay/audit.ts";
 import { DEMO_CASE_IDS, executeRecovery } from "../razorpay/executor.ts";
 import { hinglishNudge } from "../recovery/copy.ts";
 import { isCasePaid, latestHeardVoice } from "../recovery/ledger.ts";
@@ -49,6 +50,7 @@ function parsedFromLedger(voice: { transcript?: string; intent?: string; confide
 }
 
 export function queuePreview(): QueueItem[] {
+  const minted = new Map(liveLinks().map((row) => [row.caseId, row.link.shortUrl]));
   return nightQueue().map((c) => ({
     id: c.id,
     name: c.customerName,
@@ -60,6 +62,7 @@ export function queuePreview(): QueueItem[] {
     bank: c.bank,
     course: eurekaCourse(c.id),
     live: LIVE.has(c.id),
+    linkUrl: minted.get(c.id),
     inbound: c.customerReply,
     promiseToPayDay: c.promiseToPayDay,
     claimedPaid: c.claimedPaid,
@@ -99,13 +102,13 @@ export async function actOnCase(
   const isLiveTarget = live && LIVE.has(caseId);
   const shouldNotify = options.notify === true;
 
-  let linkUrl: string | undefined;
+  let linkUrl = findLink(caseId)?.shortUrl;
   let emailed = false;
   let emailError: string | undefined;
 
   if (isLiveTarget && decision.allowed) {
     const audit = await executeRecovery(caseId);
-    linkUrl = audit.link?.shortUrl;
+    linkUrl = audit.link?.shortUrl ?? linkUrl;
     const inbox = DEMO_INBOXES.find((row) => row.caseId === caseId);
     if (shouldNotify && inbox && mailStatus().configured && audit.outcome !== "failed") {
       const sent = await sendReminders([inbox.email]);

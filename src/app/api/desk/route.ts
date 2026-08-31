@@ -3,6 +3,7 @@ import { queuePreview } from "@/lib/autopilot/engine";
 import { mailStatus } from "@/lib/email/send";
 import { EUREKA } from "@/lib/merchant/eureka";
 import { razorpayStatus } from "@/lib/razorpay/client";
+import { describeLiveLinks } from "@/lib/razorpay/executor";
 import { evaluateBatch } from "@/lib/recovery/evaluate";
 import { formatINR } from "@/lib/recovery/taxonomy";
 
@@ -25,6 +26,7 @@ export function GET() {
       cases: report.cases.length,
     },
     queue: queuePreview(),
+    liveLinks: describeLiveLinks(),
   });
 }
 

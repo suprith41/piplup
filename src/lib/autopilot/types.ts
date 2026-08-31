@@ -9,6 +9,7 @@ export type QueueItem = {
   bank: string;
   course: string;
   live: boolean;
+  linkUrl?: string;
   inbound?: string;
   promiseToPayDay?: number;
   claimedPaid?: boolean;

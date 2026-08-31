@@ -83,6 +83,7 @@ type Boot = {
     cases: number;
   };
   queue: QueueItem[];
+  liveLinks?: Array<{ id: string; name: string; decline: string; mutation: string; shortUrl: string }>;
 };
 
 export function Desk() {
@@ -154,6 +155,31 @@ export function Desk() {
       .then((r) => r.json())
       .then(setBoot);
   }, []);
+
+  useEffect(() => {
+    const links = boot?.liveLinks;
+    if (!links?.length) return;
+    const urls = new Map(links.map((row) => [row.id, row.shortUrl]));
+    const byIdNext = { ...snapshot.current.byId };
+    let changed = false;
+    for (const [id, url] of urls) {
+      const existing = byIdNext[id];
+      if (!existing || existing.linkUrl === url) continue;
+      byIdNext[id] = { ...existing, linkUrl: url };
+      changed = true;
+    }
+    const feedNext = snapshot.current.feed.map((event) => {
+      const url = urls.get(event.caseId);
+      if (!url || event.linkUrl === url) return event;
+      changed = true;
+      return { ...event, linkUrl: url };
+    });
+    if (!changed) return;
+    snapshot.current = { ...snapshot.current, byId: byIdNext, feed: feedNext };
+    saveNight(snapshot.current);
+    setById(byIdNext);
+    setFeed(feedNext);
+  }, [boot]);
 
   useEffect(() => {
     if (!boot) return;
@@ -522,6 +548,7 @@ export function Desk() {
             feed={feed}
             mix={mix}
             queue={boot?.queue ?? []}
+            liveLinks={boot?.liveLinks ?? []}
             mailNote={mailNote}
             onVoice={(event) => {
               setById((prev) => ({ ...prev, [event.caseId]: event }));
@@ -531,7 +558,9 @@ export function Desk() {
             onVoiceNote={setTape}
           />
         ) : null}
-        {tab === "students" ? <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} /> : null}
+        {tab === "students" ? (
+          <StudentsTable queue={boot?.queue ?? []} byId={byId} hotId={hotId} liveLinks={boot?.liveLinks ?? []} />
+        ) : null}
         {tab === "promises" ? <PromisesBoard queue={boot?.queue ?? []} byId={byId} /> : null}
         {tab === "halted" ? <HaltedList feed={feed.filter((e) => e.stopped)} /> : null}
         {seen.analytics ? (
@@ -589,6 +618,7 @@ function DeskFloor(props: {
   feed: DeskEvent[];
   mix: { key: string; n: number }[];
   queue: QueueItem[];
+  liveLinks: Array<{ id: string; name: string; decline: string; mutation: string; shortUrl: string }>;
   mailNote: string | null;
   onVoice: (event: DeskEvent) => void;
   onVoiceNote: (note: string) => void;
@@ -611,6 +641,7 @@ function DeskFloor(props: {
     feed,
     mix,
     queue,
+    liveLinks,
     mailNote,
     onVoice,
     onVoiceNote,
@@ -651,6 +682,30 @@ function DeskFloor(props: {
           />
         ))}
       </section>
+
+      {liveLinks.length > 0 ? (
+        <section className="desk-card p-5">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <h2 className="font-display text-base tracking-tight">Live Payment Links</h2>
+            <p className="text-xs text-ink/40">{liveLinks.length} minted tonight</p>
+          </div>
+          <ul className="mt-3 divide-y divide-ink/5">
+            {liveLinks.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2 text-sm">
+                <p>
+                  <span className="font-medium">{row.name}</span>{" "}
+                  <span className="text-ink/45">
+                    {row.id} · {row.decline.replaceAll("_", " ")}
+                  </span>
+                </p>
+                <a className="text-xs text-moss underline" href={row.shortUrl} target="_blank" rel="noreferrer">
+                  {row.shortUrl}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       {mailNote ? <p className="text-sm text-moss">{mailNote}</p> : null}
 
       <section className="grid gap-4 xl:grid-cols-2">
@@ -748,9 +803,9 @@ function LiveCard({
       {event?.emailed ? <p className="mt-2 text-xs text-moss">Mailed from Eureka Labs.</p> : null}
       {event?.emailError ? <p className="mt-2 text-xs text-orange-700">{event.emailError}</p> : null}
       {mail && !event?.emailed ? <p className="mt-2 text-xs text-neutral-400">Mail only on Send emails.</p> : null}
-      {event?.linkUrl ? (
-        <a className="mt-3 inline-block text-xs text-moss underline" href={event.linkUrl} target="_blank" rel="noreferrer">
-          {event.linkUrl}
+      {(event?.linkUrl ?? row.linkUrl) ? (
+        <a className="mt-3 inline-block text-xs text-moss underline" href={event?.linkUrl ?? row.linkUrl} target="_blank" rel="noreferrer">
+          {event?.linkUrl ?? row.linkUrl}
         </a>
       ) : null}
       <CallButton caseId={row.id} name={row.name} onVoice={onVoice} onVoiceNote={onVoiceNote} />
@@ -787,11 +842,14 @@ function StudentsTable({
   queue,
   byId,
   hotId,
+  liveLinks,
 }: {
   queue: QueueItem[];
   byId: Record<string, DeskEvent>;
   hotId: string | null;
+  liveLinks: Array<{ id: string; shortUrl: string }>;
 }) {
+  const urls = new Map(liveLinks.map((row) => [row.id, row.shortUrl]));
   return (
     <div className="mt-8 overflow-hidden desk-card">
       <div className="px-5 py-4">
@@ -806,6 +864,7 @@ function StudentsTable({
               <th className="px-3 py-2 font-normal">Bank</th>
               <th className="px-3 py-2 font-normal">Fail</th>
               <th className="px-3 py-2 font-normal">Piplup</th>
+              <th className="px-3 py-2 font-normal">Link</th>
               <th className="px-3 py-2 font-normal">NPCI</th>
               <th className="px-5 py-2 font-normal">Seat</th>
             </tr>
@@ -814,6 +873,7 @@ function StudentsTable({
             {queue.map((row) => {
               const event = byId[row.id];
               const hot = hotId === row.id;
+              const url = event?.linkUrl ?? row.linkUrl ?? urls.get(row.id);
               return (
                 <tr key={row.id} className="border-t border-ink/5">
                   <td className="px-5 py-2.5">
@@ -824,6 +884,15 @@ function StudentsTable({
                   <td className="px-3 py-2.5 text-neutral-500">{row.bank}</td>
                   <td className="px-3 py-2.5 text-neutral-500">{row.decline.replaceAll("_", " ")}</td>
                   <td className="px-3 py-2.5 text-neutral-500">{event?.action ?? (hot ? "on the wire" : "—")}</td>
+                  <td className="px-3 py-2.5">
+                    {url ? (
+                      <a className="text-xs text-moss underline" href={url} target="_blank" rel="noreferrer">
+                        Pay
+                      </a>
+                    ) : (
+                      <span className="text-neutral-300">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2.5 text-[11px] text-neutral-400">{npciCell(event)}</td>
                   <td className={`px-5 py-2.5 text-[11px] ${event ? tone(event) : "text-neutral-300"}`}>
                     {hot ? "hot" : event ? badge(event) : "waiting"}

@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+type Needed = { id: string; name: string; decline: string; mutation: string };
+
 type Status = {
   configured: boolean;
   testMode: boolean;
   keyPrefix: string;
   demo: Array<{ id: string; name: string; decline: string; mutation: string }>;
+  needed?: Needed[];
+  cap?: number;
 };
 
 type Row = {
@@ -47,6 +51,7 @@ type Inbox = { caseId: string; name: string; decline: string; email: string };
 export function RecoverLive() {
   const [status, setStatus] = useState<Status | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
+  const [live, setLive] = useState<Array<{ id: string; name: string; decline: string; mutation: string; shortUrl: string }>>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [inboxes, setInboxes] = useState<Inbox[]>([]);
@@ -66,7 +71,10 @@ export function RecoverLive() {
       .then(setStatus);
     void fetch("/api/recover")
       .then((r) => r.json())
-      .then((d: { audit?: Row[] }) => setRows(d.audit ?? []));
+      .then((d: { audit?: Row[]; live?: typeof live }) => {
+        setRows(d.audit ?? []);
+        setLive(d.live ?? []);
+      });
     void loadMail();
     void loadLedger();
   }, []);
@@ -99,19 +107,27 @@ export function RecoverLive() {
     setQuota(next);
   }
 
-  async function run(injectTimeout = false) {
+  async function run(injectTimeout = false, granted = false) {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/recover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ demo: true, injectTimeout }),
+        body: JSON.stringify(granted ? { granted: true, injectTimeout } : { demo: true, injectTimeout }),
       });
-      const data = (await res.json()) as { rows?: Row[]; paid?: { caseId: string; paid: boolean; reason: string }; error?: string };
+      const data = (await res.json()) as {
+        rows?: Row[];
+        needed?: number;
+        capped?: string;
+        error?: string;
+      };
       if (!res.ok) throw new Error(data.error ?? "recover failed");
       const extra = data.rows ?? [];
       if (extra.length) setRows((prev) => [...prev, ...extra]);
+      if (data.capped) setError(data.capped);
+      const fresh = await fetch("/api/recover").then((r) => r.json()) as { live?: typeof live };
+      setLive(fresh.live ?? []);
       await loadLedger();
     } catch (err) {
       setError(err instanceof Error ? err.message : "recover failed");
@@ -197,9 +213,9 @@ export function RecoverLive() {
           <p className="mono text-[11px] uppercase tracking-wider text-moss">Live · Razorpay Test Mode</p>
           <h2 className="mt-1 text-lg font-semibold">Create recovery Payment Links</h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-ink/65">
-            Eureka Labs students whose AI/ML subscription failed. Policy grants first. Then we mint a real test-mode
-            link for three demo cases only — expired card, paused mandate, checkout drop. Test accounts cap at 30
-            links, so the batch itself stays simulated.
+            Eureka Labs students whose AI/ML subscription failed. Policy grants first. Silent retries and freezes do
+            not get a link. Test accounts cap at {status?.cap ?? 30} Payment Links, so we mint until that ceiling and
+            reuse any live ones.
           </p>
         </div>
         <div className="mono text-right text-[11px] text-ink/45">
@@ -226,9 +242,19 @@ export function RecoverLive() {
           type="button"
           disabled={busy || !status?.configured}
           onClick={() => void run(false)}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+          className="rounded border border-ink/20 px-4 py-2 text-sm disabled:opacity-40"
         >
           {busy ? "Calling Razorpay…" : "Create 3 test links"}
+        </button>
+        <button
+          type="button"
+          disabled={busy || !status?.configured}
+          onClick={() => void run(false, true)}
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+        >
+          {busy
+            ? "Calling Razorpay…"
+            : `Create links for everyone who needs one (${status?.needed?.length ?? 0})`}
         </button>
         <button
           type="button"
@@ -328,6 +354,27 @@ export function RecoverLive() {
         ) : null}
         {mailNote ? <p className="mt-2 text-sm text-ink/70">{mailNote}</p> : null}
       </div>
+
+      {live.length > 0 ? (
+        <div className="mt-6">
+          <p className="mono text-[11px] uppercase tracking-wider text-ink/45">Live Payment Links</p>
+          <ul className="mt-3 space-y-2 text-sm">
+            {live.map((row) => (
+              <li key={row.id} className="flex flex-wrap items-baseline justify-between gap-2 border-t border-ink/5 pt-2">
+                <p>
+                  <span className="font-medium">{row.name}</span>{" "}
+                  <span className="mono text-xs text-ink/45">
+                    {row.id} · {row.decline.replaceAll("_", " ")}
+                  </span>
+                </p>
+                <a className="text-moss underline" href={row.shortUrl} target="_blank" rel="noreferrer">
+                  {row.shortUrl}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {error ? <p className="mt-3 text-sm text-rust">{error}</p> : null}
 

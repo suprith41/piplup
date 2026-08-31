@@ -36,9 +36,32 @@ export function appendAudit(line: Omit<AuditLine, "at">): AuditLine {
   return full;
 }
 
+const LINK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export function findLink(caseId: string): CreatedLink | undefined {
-  return load()
-    .slice()
-    .reverse()
-    .find((row) => row.caseId === caseId && row.link)?.link;
+  return liveLinks().find((row) => row.caseId === caseId)?.link;
+}
+
+export interface LiveLink {
+  caseId: string;
+  mutation: string;
+  at: string;
+  link: CreatedLink;
+}
+
+/** Latest unexpired Payment Link per case. Old reused audit rows are ignored. */
+export function liveLinks(): LiveLink[] {
+  const latest = new Map<string, LiveLink>();
+  const now = Date.now();
+  for (const row of load()) {
+    if (row.outcome !== "created" || !row.link) continue;
+    if (now - new Date(row.at).getTime() > LINK_TTL_MS) continue;
+    latest.set(row.caseId, {
+      caseId: row.caseId,
+      mutation: row.mutation,
+      at: row.at,
+      link: row.link,
+    });
+  }
+  return [...latest.values()].sort((a, b) => a.caseId.localeCompare(b.caseId));
 }
