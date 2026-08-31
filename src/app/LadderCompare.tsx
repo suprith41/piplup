@@ -38,8 +38,8 @@ export function LadderCompare({ cases, adaptive, baseline }: Props) {
 
   return (
     <section className="mt-12">
-      <h2 className="text-base font-medium">The bounded workflow</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+      <h2 className="font-display text-lg tracking-tight">The bounded workflow</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5a6178]">
         A policy decides once; a workflow runs for days and has to know when to stop. Guardrails on every case: contact
         only at 10:00 IST, quiet hours {QUIET_HOURS_IST}, at most {MAX_CONTACTS_PER_CYCLE} messages per cycle, and a
         hard stop with a date on it. Greyed steps were planned and never sent, because the money had already landed.

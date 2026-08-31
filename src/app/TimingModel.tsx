@@ -29,8 +29,8 @@ const CATEGORY_LABEL: Record<WindowCategory, string> = {
 export function TimingModel({ picks, sweep, calendarHour }: Props) {
   return (
     <section className="mt-12">
-      <h2 className="text-base font-medium">When to present</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-500">
+      <h2 className="font-display text-lg tracking-tight">When to present</h2>
+      <p className="mt-2 max-w-2xl text-sm leading-6 text-[#5a6178]">
         A calendar cycle answers this with an offset: T+1, T+2, T+3, in the {pad(calendarHour)}:00 batch. That is a
         date, and a payday is a date <em>and</em> an hour — present at {pad(calendarHour)}:00 on the morning a salary
         lands at 09:00 and the debit bounces against yesterday&rsquo;s balance. So every hour of every day inside the

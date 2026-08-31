@@ -15,14 +15,14 @@ export default function LabPage() {
   const timingPicks = pickTimingCases(report);
 
   return (
-    <main className="min-h-screen bg-white text-[#02042b]">
-      <div className="bg-[#072654] px-6 py-1.5 text-center text-[11px] font-semibold text-white">TEST MODE</div>
+    <main className="min-h-screen bg-canvas text-ink">
+      <div className="test-mode-bar">Test mode</div>
       <div className="mx-auto max-w-5xl px-6 py-10">
-      <p className="text-xs text-neutral-400">Internal</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8c93a3]">Internal</p>
       <h1 className="mt-1 font-display text-3xl tracking-tight">Piplup lab</h1>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-neutral-500">
+      <p className="mt-2 max-w-xl text-sm leading-6 text-[#5a6178]">
         Scorecard and manual Razorpay/mail controls. The product is the{" "}
-        <Link className="font-semibold text-[#305eff]" href="/">
+        <Link className="rzp-link" href="/">
           Eureka Labs revenue desk
         </Link>
         .
@@ -83,9 +83,9 @@ function pickTimingCases(report: ReturnType<typeof evaluateBatch>) {
 
 function Stat({ k, v }: { k: string; v: string }) {
   return (
-    <div className="desk-card p-4">
-      <dt className="text-[11px] text-neutral-400">{k}</dt>
-      <dd className="mt-1 text-xl font-semibold tracking-tight">{v}</dd>
+    <div className="desk-card desk-card-hover p-4">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8c93a3]">{k}</dt>
+      <dd className="mt-1 font-display text-xl tracking-tight">{v}</dd>
     </div>
   );
 }

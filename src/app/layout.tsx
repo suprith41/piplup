@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, Mulish } from "next/font/google";
+import { IBM_Plex_Mono, Inter } from "next/font/google";
 import "./globals.css";
 
-const sans = Mulish({
+const sans = Inter({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
   variable: "--font-sans",
 });
 
@@ -28,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className={`${sans.variable} ${mono.variable} bg-white font-sans text-[#02042b] antialiased`}>{children}</body>
+      <body className={`${sans.variable} ${mono.variable} bg-canvas font-sans text-ink antialiased`}>{children}</body>
     </html>
   );
 }

@@ -443,63 +443,72 @@ export function Desk() {
   const mix = mixCounts(boot?.queue ?? [], byId);
 
   return (
-    <div className="flex min-h-screen bg-white text-[#02042b]">
-      <aside className="sticky top-0 flex h-screen w-[232px] shrink-0 flex-col border-r border-[#e6e9ee] bg-white">
+    <div className="flex min-h-screen flex-col bg-canvas text-ink">
+      <div className="test-mode-bar">Test mode</div>
+      <div className="flex min-h-0 flex-1">
+      <aside className="sticky top-0 hidden h-[calc(100vh-28px)] w-[240px] shrink-0 flex-col border-r border-[#e6eaf2] bg-white lg:flex">
         <div className="flex items-center gap-2.5 px-5 py-5">
-          <span className="grid h-8 w-8 place-items-center rounded bg-[#305eff] text-[13px] font-extrabold text-white">E</span>
+          <RzpMark />
           <div>
-            <p className="text-[13px] font-extrabold leading-none">{EUREKA.name}</p>
-            <p className="mt-1 text-[11px] text-[#6c737f]">{EUREKA.city}</p>
+            <p className="text-[13px] font-extrabold leading-none tracking-tight">Piplup</p>
+            <p className="mt-1 text-[11px] text-[#8c93a3]">Recovery desk</p>
           </div>
         </div>
         <nav className="flex flex-1 flex-col gap-0.5 px-3">
-          <NavBtn active={tab === "desk"} onClick={() => openTab("desk")}>
-            Desk
+          <NavBtn active={tab === "desk"} icon={<IconDesk />} onClick={() => openTab("desk")}>
+            Payments
           </NavBtn>
-          <NavBtn active={tab === "students"} onClick={() => openTab("students")}>
-            Students
+          <NavBtn active={tab === "students"} icon={<IconUsers />} onClick={() => openTab("students")}>
+            Customers
           </NavBtn>
-          <NavBtn active={tab === "promises"} onClick={() => openTab("promises")}>
-            Promises
+          <NavBtn active={tab === "promises"} icon={<IconPromise />} onClick={() => openTab("promises")}>
+            Settlements
           </NavBtn>
-          <NavBtn active={tab === "halted"} onClick={() => openTab("halted")}>
-            Stopped{stopped ? ` · ${stopped}` : ""}
+          <NavBtn active={tab === "halted"} icon={<IconStop />} onClick={() => openTab("halted")}>
+            Disputes{stopped ? ` · ${stopped}` : ""}
           </NavBtn>
-          <NavBtn active={tab === "analytics"} onClick={() => openTab("analytics")}>
-            Analytics
+          <NavBtn active={tab === "analytics"} icon={<IconChart />} onClick={() => openTab("analytics")}>
+            Reports
           </NavBtn>
-          <NavBtn active={tab === "prevent"} onClick={() => openTab("prevent")}>
-            Prevent
+          <NavBtn active={tab === "prevent"} icon={<IconShield />} onClick={() => openTab("prevent")}>
+            Smart Prevent
           </NavBtn>
         </nav>
-        <div className="border-t border-[#e6e9ee] px-5 py-4">
-          <p className="text-[11px] font-semibold text-[#305eff]">TEST MODE</p>
-          <p className="mt-1 text-[11px] leading-4 text-[#6c737f]">UPI AutoPay · eNACH · cards</p>
-          <Link className="mt-3 inline-block text-[12px] font-semibold text-[#305eff]" href="/lab">
+        <div className="border-t border-[#e6eaf2] px-5 py-4">
+          <p className="rzp-chip bg-[#fff4d6] text-[#8a5a00]">TEST MODE</p>
+          <p className="mt-2 text-[11px] leading-4 text-[#8c93a3]">UPI AutoPay · eNACH · cards</p>
+          <Link className="rzp-link mt-3 inline-block text-[12px]" href="/lab">
             Developer lab →
           </Link>
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1 bg-white">
-        <header className="sticky top-0 z-10 flex flex-wrap items-center justify-between gap-3 border-b border-[#e6e9ee] bg-white px-6 py-3">
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#6c737f]">
-              {EUREKA.cohort} · {EUREKA.cycle}
-            </p>
-            <p className="text-sm font-semibold">
-              {EUREKA.operator}
-              {boot?.groq?.configured ? " · Groq" : " · rules"}
-            </p>
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-10 border-b border-[#e6eaf2] bg-white/95 backdrop-blur-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <span className="lg:hidden">
+              <RzpMark />
+            </span>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#8c93a3]">
+                {EUREKA.name}
+              </p>
+              <p className="font-display text-[15px] leading-5">{EUREKA.city}</p>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="mono text-xs tabular-nums text-[#6c737f]">{clock || "—"} IST</p>
-            <span className={`text-xs font-semibold ${running ? "text-[#0d9f6e]" : "text-[#6c737f]"}`}>
-              <span className={running ? "desk-pulse" : ""}>{running ? "●" : "○"}</span>{" "}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <p className="mono text-xs tabular-nums text-[#8c93a3]">{clock || "—"} IST</p>
+            <span
+              className={`rzp-chip ${
+                running ? "bg-[#e8f8f0] text-[#007a4d]" : done ? "bg-[#eef1f8] text-[#5a6178]" : "bg-[#eef1f8] text-[#5a6178]"
+              }`}
+            >
+              {running ? <span className="live-dot" /> : <span className="h-1.5 w-1.5 rounded-full bg-[#c5cad6]" />}
               {running ? "Live" : done ? "Closed" : "Idle"}
             </span>
             {running ? (
-              <button type="button" className="rzp-btn-ghost px-3 py-1.5" onClick={stopNight}>
+              <button type="button" className="rzp-btn-ghost px-3.5 py-2" onClick={stopNight}>
                 Pause
               </button>
             ) : (
@@ -511,7 +520,7 @@ export function Desk() {
                   started.current = true;
                   void runNight();
                 }}
-                className="rzp-btn-ghost px-3 py-1.5 disabled:opacity-40"
+                className="rzp-btn-ghost px-3.5 py-2 disabled:opacity-40"
               >
                 Replay
               </button>
@@ -520,14 +529,36 @@ export function Desk() {
               type="button"
               disabled={!boot?.mail.configured || mailing}
               onClick={() => void sendEmails()}
-              className="rzp-btn px-4 py-1.5 disabled:opacity-40"
+              className="rzp-btn px-4 py-2 disabled:opacity-40"
             >
               {mailing ? "Sending…" : "Send emails"}
             </button>
           </div>
+        </div>
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-2 lg:hidden">
+          <NavBtn active={tab === "desk"} icon={<IconDesk />} onClick={() => openTab("desk")} compact>
+            Payments
+          </NavBtn>
+          <NavBtn active={tab === "students"} icon={<IconUsers />} onClick={() => openTab("students")} compact>
+            Customers
+          </NavBtn>
+          <NavBtn active={tab === "promises"} icon={<IconPromise />} onClick={() => openTab("promises")} compact>
+            Settlements
+          </NavBtn>
+          <NavBtn active={tab === "halted"} icon={<IconStop />} onClick={() => openTab("halted")} compact>
+            Disputes{stopped ? ` · ${stopped}` : ""}
+          </NavBtn>
+          <NavBtn active={tab === "analytics"} icon={<IconChart />} onClick={() => openTab("analytics")} compact>
+            Reports
+          </NavBtn>
+          <NavBtn active={tab === "prevent"} icon={<IconShield />} onClick={() => openTab("prevent")} compact>
+            Prevent
+          </NavBtn>
+        </nav>
         </header>
 
         <main className="px-6 py-6">
+        <PageTitle tab={tab} />
 
         {tab === "desk" ? (
           <DeskFloor
@@ -573,9 +604,29 @@ export function Desk() {
             <PreventBoard />
           </div>
         ) : null}
-        {error ? <p className="mt-4 text-sm text-[#e5533c]">{error}</p> : null}
+        {error ? <p className="mt-4 text-sm text-rust">{error}</p> : null}
         </main>
       </div>
+      </div>
+    </div>
+  );
+}
+
+const PAGE_COPY: Record<Tab, { title: string; caption: string }> = {
+  desk: { title: "Payments", caption: "Failed AutoPays land here. Policy grants first." },
+  students: { title: "Customers", caption: "September roster — every seat, bank, and next action." },
+  promises: { title: "Settlements", caption: "Inbound replies become a date, a freeze, or a broken promise." },
+  halted: { title: "Disputes", caption: "Cases we left alone on purpose. Calendar T+3 still hammers them." },
+  analytics: { title: "Reports", caption: "The same book the desk is running, scored like Stripe’s KPI set." },
+  prevent: { title: "Smart Prevent", caption: "Failures we can see coming — flagged three days out, zero NPCI slots." },
+};
+
+function PageTitle({ tab }: { tab: Tab }) {
+  const copy = PAGE_COPY[tab];
+  return (
+    <div className="mb-5 rise-in">
+      <h1 className="font-display text-[28px] leading-8 tracking-tight">{copy.title}</h1>
+      <p className="mt-1 text-sm text-[#5a6178]">{copy.caption}</p>
     </div>
   );
 }
@@ -583,20 +634,102 @@ export function Desk() {
 function NavBtn({
   active,
   onClick,
+  icon,
   children,
+  compact = false,
 }: {
   active: boolean;
   onClick: () => void;
+  icon: ReactNode;
   children: ReactNode;
+  compact?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`w-full rounded px-3 py-2 text-left text-[13px] ${active ? "bg-[#eef2ff] font-semibold text-[#305eff]" : "font-medium text-[#4f566b] hover:bg-[#f6f7f9] hover:text-[#02042b]"}`}
+      className={`relative flex items-center gap-2 rounded-md px-3 py-2 text-left text-[13px] transition-colors duration-150 ease-blade ${
+        compact ? "shrink-0 whitespace-nowrap" : "w-full"
+      } ${
+        active ? "bg-[#eef2ff] font-semibold text-rzp" : "font-medium text-[#5a6178] hover:bg-[#f4f6fb] hover:text-ink"
+      }`}
     >
+      {!compact && active ? <span className="absolute bottom-1.5 left-0 top-1.5 w-[3px] rounded-r bg-rzp" /> : null}
+      <span className={active ? "text-rzp" : "text-[#8c93a3]"}>{icon}</span>
       {children}
     </button>
+  );
+}
+
+function RzpMark() {
+  return (
+    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[7px] bg-rzp text-[15px] font-extrabold text-white">
+      P
+    </span>
+  );
+}
+
+function IconDesk() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="9" y="1.5" width="5.5" height="5.5" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="1.5" y="9" width="5.5" height="5.5" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
+      <rect x="9" y="9" width="5.5" height="5.5" rx="1.2" stroke="currentColor" strokeWidth="1.4" />
+    </svg>
+  );
+}
+
+function IconUsers() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M2.2 13c.4-2.2 2-3.4 3.8-3.4S9.4 10.8 9.8 13" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="11.2" cy="5.2" r="1.8" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M13.8 13c-.3-1.6-1.3-2.6-2.6-2.8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconPromise() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.6" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M2 6h12M5.5 1.5v2.5M10.5 1.5v2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconStop() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M4.2 4.2l7.6 7.6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconChart() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path d="M2 13h12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <rect x="3.2" y="7" width="2.2" height="4.2" rx="0.5" fill="currentColor" />
+      <rect x="6.9" y="4.2" width="2.2" height="7" rx="0.5" fill="currentColor" />
+      <rect x="10.6" y="5.6" width="2.2" height="5.6" rx="0.5" fill="currentColor" />
+    </svg>
+  );
+}
+
+function IconShield() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+      <path
+        d="M8 2.2l5.2 1.8v4.4c0 3.1-2.1 5.2-5.2 6.2-3.1-1-5.2-3.1-5.2-6.2V4L8 2.2z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -648,18 +781,23 @@ function DeskFloor(props: {
   } = props;
 
   return (
-    <div className="mt-8 space-y-8">
-      <section className="min-h-[88px]">
-        <p className="line-clamp-2 max-w-2xl font-display text-[32px] leading-10 text-[#02042b]">
-          {tape}
-        </p>
-        <p className="mt-2 text-sm text-ink/50">
-          {running
-            ? `${cursor} of ${total} handled.`
-            : done
-              ? `Night closed. Recovered ${formatINR(recoveredPaise)} vs T+3.`
-              : "Autopilot starts when this page loads."}
-        </p>
+    <div className="space-y-5">
+      <section className="desk-card overflow-hidden">
+        <div className="flex items-start gap-3 border-l-[3px] border-rzp bg-[#eef2ff] px-4 py-3.5">
+          {running ? <span className="live-dot mt-1.5 shrink-0" /> : <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rzp" />}
+          <div className="min-w-0">
+            <p key={tape} className="tape-swap line-clamp-2 text-sm font-semibold leading-6 text-ink">
+              {tape}
+            </p>
+            <p className="mt-0.5 text-xs text-[#5a6178]">
+              {running
+                ? `${cursor} of ${total} handled.`
+                : done
+                  ? `Night closed. Recovered ${formatINR(recoveredPaise)} vs T+3.`
+                  : "Autopilot starts when this page loads."}
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -687,18 +825,18 @@ function DeskFloor(props: {
         <section className="desk-card p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <h2 className="font-display text-base tracking-tight">Live Payment Links</h2>
-            <p className="text-xs text-ink/40">{liveLinks.length} minted tonight</p>
+            <p className="text-xs text-[#8c93a3]">{liveLinks.length} minted tonight</p>
           </div>
-          <ul className="mt-3 divide-y divide-ink/5">
+          <ul className="mt-3 divide-y divide-[#eef1f8]">
             {liveLinks.map((row) => (
-              <li key={row.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2 text-sm">
+              <li key={row.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2.5 text-sm">
                 <p>
                   <span className="font-medium">{row.name}</span>{" "}
-                  <span className="text-ink/45">
+                  <span className="text-[#8c93a3]">
                     {row.id} · {row.decline.replaceAll("_", " ")}
                   </span>
                 </p>
-                <a className="text-xs text-moss underline" href={row.shortUrl} target="_blank" rel="noreferrer">
+                <a className="rzp-link text-xs" href={row.shortUrl} target="_blank" rel="noreferrer">
                   {row.shortUrl}
                 </a>
               </li>
@@ -706,19 +844,19 @@ function DeskFloor(props: {
           </ul>
         </section>
       ) : null}
-      {mailNote ? <p className="text-sm text-moss">{mailNote}</p> : null}
+      {mailNote ? <p className="text-sm font-medium text-moss">{mailNote}</p> : null}
 
       <section className="grid gap-4 xl:grid-cols-2">
         <Tape title="Incoming" caption="Razorpay" empty="Waiting for the first failed AutoPay.">
           {ingress.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="border-t border-ink/5 px-4 py-3 first:border-t-0">
-              <p className="text-xs text-ink/40">
+            <li key={`${row.caseId}-${row.at}`} className="desk-in border-t border-[#eef1f8] px-4 py-3 first:border-t-0">
+              <p className="text-xs text-[#8c93a3]">
                 {row.source}
                 {row.live ? " · live" : ""}
               </p>
               <p className="mt-0.5 text-sm">
                 {row.name}{" "}
-                <span className="text-neutral-400">
+                <span className="text-[#8c93a3]">
                   {row.amount} · {row.decline.replaceAll("_", " ")} · {row.bank}
                 </span>
               </p>
@@ -727,14 +865,14 @@ function DeskFloor(props: {
         </Tape>
         <Tape title="Piplup" caption="Decisions" empty="Decisions land here.">
           {feed.map((row) => (
-            <li key={`${row.caseId}-${row.at}`} className="border-t border-ink/5 px-4 py-3 first:border-t-0">
+            <li key={`${row.caseId}-${row.at}`} className="desk-in border-t border-[#eef1f8] px-4 py-3 first:border-t-0">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm">
-                  {row.name} <span className="text-neutral-400">{row.amount}</span>
+                  {row.name} <span className="text-[#8c93a3]">{row.amount}</span>
                 </p>
-                <p className={`text-[11px] ${tone(row)}`}>{badge(row)}</p>
+                <StatusChip event={row} />
               </div>
-              <p className="mt-1 text-xs leading-5 text-neutral-500">{row.action}</p>
+              <p className="mt-1 text-xs leading-5 text-[#5a6178]">{row.action}</p>
             </li>
           ))}
         </Tape>
@@ -743,7 +881,7 @@ function DeskFloor(props: {
       <section className="desk-card p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="font-display text-base tracking-tight">September cohort</h2>
-          <p className="text-xs text-ink/40">
+          <p className="text-xs text-[#8c93a3]">
             {liveHits} live {liveHits === 1 ? "hit" : "hits"} · {cursor}/{total}
           </p>
         </div>
@@ -752,14 +890,14 @@ function DeskFloor(props: {
             <span
               key={row.id}
               title={`${row.name} · ${row.decline}`}
-              className={`h-3 w-3 rounded-sm ${seatClass(seatFor(row.id, byId, hotId), row.live)}`}
+              className={`h-3 w-3 rounded-[3px] transition-transform duration-150 ease-blade hover:scale-125 ${seatClass(seatFor(row.id, byId, hotId), row.live)}`}
             />
           ))}
         </div>
-        <div className="mt-4 flex flex-wrap gap-4 text-xs text-ink/50">
+        <div className="mt-4 flex flex-wrap gap-4 text-xs text-[#5a6178]">
           {mix.map((row) => (
             <p key={row.key}>
-              <span className="text-neutral-800">{row.n}</span> {row.key}
+              <span className="font-semibold text-ink">{row.n}</span> {row.key}
             </p>
           ))}
         </div>
@@ -784,27 +922,36 @@ function LiveCard({
   onVoiceNote: (note: string) => void;
 }) {
   return (
-    <article className={`desk-card p-4 transition-shadow duration-200 ${hot ? "shadow-[0_0_0_1px_#305eff]" : ""}`}>
+    <article
+      className={`desk-card desk-card-hover overflow-hidden p-4 ${hot ? "border-rzp shadow-[0_0_0_1px_#305eff]" : ""}`}
+    >
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[11px] uppercase tracking-wide text-moss">Live</p>
-          <h3 className="mt-0.5 text-base font-medium">{row.name}</h3>
-          <p className="text-xs text-neutral-400">
+          <p className="rzp-chip bg-[#e8f8f0] text-[#007a4d]">
+            <span className="live-dot" />
+            Live
+          </p>
+          <h3 className="mt-2 text-base font-semibold tracking-tight">{row.name}</h3>
+          <p className="text-xs text-[#8c93a3]">
             {row.course} · {row.amount}
           </p>
         </div>
-        <p className={`text-[11px] ${event ? tone(event) : "text-neutral-400"}`}>
-          {hot ? "Razorpay" : event ? badge(event) : "queued"}
-        </p>
+        {hot ? (
+          <span className="rzp-chip bg-[#eef2ff] text-rzp">Razorpay</span>
+        ) : event ? (
+          <StatusChip event={event} />
+        ) : (
+          <span className="rzp-chip bg-[#eef1f8] text-[#8c93a3]">queued</span>
+        )}
       </div>
-      <p className="mt-3 text-sm leading-6 text-neutral-600">
+      <p className="mt-3 text-sm leading-6 text-[#5a6178]">
         {event?.action ?? `${row.decline.replaceAll("_", " ")}. Waiting.`}
       </p>
-      {event?.emailed ? <p className="mt-2 text-xs text-moss">Mailed from Eureka Labs.</p> : null}
-      {event?.emailError ? <p className="mt-2 text-xs text-orange-700">{event.emailError}</p> : null}
-      {mail && !event?.emailed ? <p className="mt-2 text-xs text-neutral-400">Mail only on Send emails.</p> : null}
+      {event?.emailed ? <p className="mt-2 text-xs font-medium text-moss">Mailed from Eureka Labs.</p> : null}
+      {event?.emailError ? <p className="mt-2 text-xs text-amber-800">{event.emailError}</p> : null}
+      {mail && !event?.emailed ? <p className="mt-2 text-xs text-[#8c93a3]">Mail only on Send emails.</p> : null}
       {(event?.linkUrl ?? row.linkUrl) ? (
-        <a className="mt-3 inline-block text-xs text-moss underline" href={event?.linkUrl ?? row.linkUrl} target="_blank" rel="noreferrer">
+        <a className="rzp-link mt-3 inline-block text-xs" href={event?.linkUrl ?? row.linkUrl} target="_blank" rel="noreferrer">
           {event?.linkUrl ?? row.linkUrl}
         </a>
       ) : null}
@@ -829,10 +976,10 @@ function Tape({
     <div className="desk-card">
       <div className="flex items-baseline justify-between px-4 py-3">
         <h2 className="font-display text-base tracking-tight">{title}</h2>
-        <p className="text-[11px] text-ink/40">{caption}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8c93a3]">{caption}</p>
       </div>
-      <ul className="desk-scroll max-h-[360px] overflow-y-auto border-t border-ink/5">
-        {emptyish ? <li className="px-4 py-12 text-center text-sm text-ink/40">{empty}</li> : children}
+      <ul className="desk-scroll max-h-[360px] overflow-y-auto border-t border-[#eef1f8]">
+        {emptyish ? <li className="px-4 py-12 text-center text-sm text-[#8c93a3]">{empty}</li> : children}
       </ul>
     </div>
   );
@@ -851,22 +998,22 @@ function StudentsTable({
 }) {
   const urls = new Map(liveLinks.map((row) => [row.id, row.shortUrl]));
   return (
-    <div className="mt-8 overflow-hidden desk-card">
+    <div className="overflow-hidden desk-card">
       <div className="px-5 py-4">
         <h2 className="font-display text-lg tracking-tight">September roster</h2>
       </div>
       <div className="desk-scroll max-h-[70vh] overflow-auto">
         <table className="w-full text-left text-sm">
-          <thead className="sticky top-0 bg-white text-[11px] text-ink/40">
+          <thead className="sticky top-0 bg-[#f8f9fc] text-[11px] font-semibold uppercase tracking-[0.06em] text-[#8c93a3]">
             <tr>
-              <th className="px-5 py-2 font-normal">Student</th>
-              <th className="px-3 py-2 font-normal">Course</th>
-              <th className="px-3 py-2 font-normal">Bank</th>
-              <th className="px-3 py-2 font-normal">Fail</th>
-              <th className="px-3 py-2 font-normal">Piplup</th>
-              <th className="px-3 py-2 font-normal">Link</th>
-              <th className="px-3 py-2 font-normal">NPCI</th>
-              <th className="px-5 py-2 font-normal">Seat</th>
+              <th className="px-5 py-2.5 font-semibold">Student</th>
+              <th className="px-3 py-2.5 font-semibold">Course</th>
+              <th className="px-3 py-2.5 font-semibold">Bank</th>
+              <th className="px-3 py-2.5 font-semibold">Fail</th>
+              <th className="px-3 py-2.5 font-semibold">Piplup</th>
+              <th className="px-3 py-2.5 font-semibold">Link</th>
+              <th className="px-3 py-2.5 font-semibold">NPCI</th>
+              <th className="px-5 py-2.5 font-semibold">Seat</th>
             </tr>
           </thead>
           <tbody>
@@ -875,27 +1022,33 @@ function StudentsTable({
               const hot = hotId === row.id;
               const url = event?.linkUrl ?? row.linkUrl ?? urls.get(row.id);
               return (
-                <tr key={row.id} className="border-t border-ink/5">
-                  <td className="px-5 py-2.5">
+                <tr key={row.id} className="border-t border-[#eef1f8] transition-colors duration-150 hover:bg-[#f8f9fc]">
+                  <td className="px-5 py-2.5 font-medium">
                     {row.name}
-                    {row.live ? <span className="ml-2 text-[10px] text-moss">LIVE</span> : null}
+                    {row.live ? <span className="ml-2 rzp-chip bg-[#e8f8f0] text-[#007a4d]">LIVE</span> : null}
                   </td>
-                  <td className="px-3 py-2.5 text-neutral-500">{row.course}</td>
-                  <td className="px-3 py-2.5 text-neutral-500">{row.bank}</td>
-                  <td className="px-3 py-2.5 text-neutral-500">{row.decline.replaceAll("_", " ")}</td>
-                  <td className="px-3 py-2.5 text-neutral-500">{event?.action ?? (hot ? "on the wire" : "—")}</td>
+                  <td className="px-3 py-2.5 text-[#5a6178]">{row.course}</td>
+                  <td className="px-3 py-2.5 text-[#5a6178]">{row.bank}</td>
+                  <td className="px-3 py-2.5 text-[#5a6178]">{row.decline.replaceAll("_", " ")}</td>
+                  <td className="px-3 py-2.5 text-[#5a6178]">{event?.action ?? (hot ? "on the wire" : "—")}</td>
                   <td className="px-3 py-2.5">
                     {url ? (
-                      <a className="text-xs text-moss underline" href={url} target="_blank" rel="noreferrer">
+                      <a className="rzp-link text-xs" href={url} target="_blank" rel="noreferrer">
                         Pay
                       </a>
                     ) : (
-                      <span className="text-neutral-300">—</span>
+                      <span className="text-[#c5cad6]">—</span>
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-[11px] text-neutral-400">{npciCell(event)}</td>
-                  <td className={`px-5 py-2.5 text-[11px] ${event ? tone(event) : "text-neutral-300"}`}>
-                    {hot ? "hot" : event ? badge(event) : "waiting"}
+                  <td className="px-3 py-2.5 text-[11px] text-[#8c93a3]">{npciCell(event)}</td>
+                  <td className="px-5 py-2.5">
+                    {hot ? (
+                      <span className="rzp-chip bg-[#eef2ff] text-rzp">hot</span>
+                    ) : event ? (
+                      <StatusChip event={event} />
+                    ) : (
+                      <span className="rzp-chip bg-[#eef1f8] text-[#8c93a3]">waiting</span>
+                    )}
                   </td>
                 </tr>
               );
@@ -924,24 +1077,24 @@ function PromisesBoard({ queue, byId }: { queue: QueueItem[]; byId: Record<strin
     .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
   return (
-    <div className="mt-8 desk-card p-5">
+    <div className="desk-card p-5">
       <h2 className="font-display text-lg tracking-tight">Promise to pay</h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-ink/55">
+      <p className="mt-2 max-w-xl text-sm leading-6 text-[#5a6178]">
         Inbound replies become a date, a freeze, or a broken promise. Policy waits. It does not guess.
       </p>
       {rows.length === 0 ? (
-        <p className="mt-8 text-sm text-neutral-400">Promises land here as the night runs, or after a live call.</p>
+        <p className="mt-8 text-sm text-[#8c93a3]">Promises land here as the night runs, or after a live call.</p>
       ) : (
-        <ul className="mt-6 divide-y divide-ink/5">
+        <ul className="mt-6 divide-y divide-[#eef1f8]">
           {rows.map(({ row, event, status, day, quote }) => (
             <li key={row.id} className="py-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm">
-                  {row.name} <span className="text-neutral-400">{row.amount}</span>
+                <p className="text-sm font-medium">
+                  {row.name} <span className="font-normal text-[#8c93a3]">{row.amount}</span>
                 </p>
-                <p className="text-[11px] text-neutral-500">{status.replaceAll("_", " ")}</p>
+                <span className={`rzp-chip ${promiseTone(status)}`}>{status.replaceAll("_", " ")}</span>
               </div>
-              <p className="mt-1 text-xs leading-5 text-neutral-500">
+              <p className="mt-1 text-xs leading-5 text-[#5a6178]">
                 {status === "claimed_paid"
                   ? "Customer says already paid. Retries frozen."
                   : status === "honored"
@@ -950,8 +1103,8 @@ function PromisesBoard({ queue, byId }: { queue: QueueItem[]; byId: Record<strin
                       ? `Waited until day ${day}. Still open.`
                       : `Parked until day ${day}.`}
               </p>
-              {quote ? <p className="mt-1 text-xs italic text-neutral-400">“{quote}”</p> : null}
-              {event?.action ? <p className="mt-1 text-xs text-neutral-400">{event.action}</p> : null}
+              {quote ? <p className="mt-1 text-xs italic text-[#8c93a3]">“{quote}”</p> : null}
+              {event?.action ? <p className="mt-1 text-xs text-[#8c93a3]">{event.action}</p> : null}
             </li>
           ))}
         </ul>
@@ -1065,7 +1218,7 @@ function CallButton({
         type="button"
         disabled={phase !== "idle"}
         onClick={() => void call()}
-        className="rounded px-3 py-1.5 text-xs font-semibold text-[#305eff] disabled:opacity-40"
+        className="rounded px-3 py-1.5 text-xs font-semibold text-rzp transition-colors duration-150 hover:bg-[#eef2ff] disabled:opacity-40"
       >
         {label}
       </button>
@@ -1073,11 +1226,11 @@ function CallButton({
         type="button"
         disabled={phase !== "idle"}
         onClick={() => void listenAndSubmit().catch((err) => setNote(err instanceof Error ? err.message : "voice failed"))}
-        className="rounded px-3 py-1.5 text-xs font-semibold text-[#305eff] disabled:opacity-40"
+        className="rounded px-3 py-1.5 text-xs font-semibold text-rzp transition-colors duration-150 hover:bg-[#eef2ff] disabled:opacity-40"
       >
         Reply
       </button>
-      {note ? <p className="basis-full text-xs text-neutral-500">{note}</p> : null}
+      {note ? <p className="basis-full text-xs text-[#5a6178]">{note}</p> : null}
     </div>
   );
 }
@@ -1143,25 +1296,25 @@ declare global {
 
 function HaltedList({ feed }: { feed: DeskEvent[] }) {
   return (
-    <div className="mt-8 desk-card p-5">
+    <div className="desk-card p-5">
       <h2 className="font-display text-lg tracking-tight">Stopped on purpose</h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-ink/55">
+      <p className="mt-2 max-w-xl text-sm leading-6 text-[#5a6178]">
         Disputes, already-paid claims and stop-texting-me get neither a debit nor a message. Calendar T+3 still hammers
         them. Revoked mandates are not here — they keep their NPCI slots and get a re-auth ask instead.
       </p>
       {feed.length === 0 ? (
-        <p className="mt-8 text-sm text-neutral-400">Terminal cases collect here as the night runs.</p>
+        <p className="mt-8 text-sm text-[#8c93a3]">Terminal cases collect here as the night runs.</p>
       ) : (
-        <ul className="mt-6 divide-y divide-ink/5">
+        <ul className="mt-6 divide-y divide-[#eef1f8]">
           {feed.map((row) => (
             <li key={row.caseId} className="py-3">
-              <p className="text-sm">
+              <p className="text-sm font-medium">
                 {row.name}{" "}
-                <span className="text-neutral-400">
+                <span className="font-normal text-[#8c93a3]">
                   {row.amount} · {row.decline.replaceAll("_", " ")}
                 </span>
               </p>
-              <p className="mt-1 text-xs leading-5 text-neutral-500">{row.reason}</p>
+              <p className="mt-1 text-xs leading-5 text-[#5a6178]">{row.reason}</p>
             </li>
           ))}
         </ul>
@@ -1172,12 +1325,32 @@ function HaltedList({ feed }: { feed: DeskEvent[] }) {
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="desk-card p-4">
-      <p className="text-[11px] uppercase tracking-[0.12em] text-ink/40">{label}</p>
+    <div className="desk-card desk-card-hover p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8c93a3]">{label}</p>
       <p className="mt-2 font-display text-3xl tracking-tight tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-ink/45">{hint}</p>
+      <p className="mt-1 text-xs text-[#8c93a3]">{hint}</p>
     </div>
   );
+}
+
+function StatusChip({ event }: { event: DeskEvent }) {
+  const label = badge(event);
+  const cls =
+    event.stopped
+      ? "bg-[#eef1f8] text-[#5a6178]"
+      : event.recovered
+        ? "bg-[#e8f8f0] text-[#007a4d]"
+        : event.emailed
+          ? "bg-[#eef2ff] text-rzp"
+          : "bg-[#fdecea] text-[#c0392b]";
+  return <span className={`rzp-chip ${cls}`}>{label}</span>;
+}
+
+function promiseTone(status: string): string {
+  if (status === "honored") return "bg-[#e8f8f0] text-[#007a4d]";
+  if (status === "broken") return "bg-[#fdecea] text-[#c0392b]";
+  if (status === "claimed_paid") return "bg-[#eef2ff] text-rzp";
+  return "bg-[#fff4d6] text-[#8a5a00]";
 }
 
 function badge(e: DeskEvent): string {
@@ -1186,12 +1359,6 @@ function badge(e: DeskEvent): string {
   if (e.recovered) return "recovered later";
   if (e.emailed) return "emailed";
   return "open";
-}
-
-function tone(e: DeskEvent): string {
-  if (e.stopped) return "text-neutral-400";
-  if (e.recovered) return "text-moss";
-  return "text-rust";
 }
 
 /** NPCI allows 1 original debit plus 3 retries. This column is what we spent of it. */
@@ -1210,11 +1377,11 @@ function seatFor(id: string, byId: Record<string, DeskEvent>, hotId: string | nu
 }
 
 function seatClass(seat: Seat, live: boolean): string {
-  const ring = live ? "ring-1 ring-neutral-900" : "";
-  if (seat === "hot") return `bg-[#305eff] ${ring}`;
+  const ring = live ? "ring-1 ring-[#02042b]" : "";
+  if (seat === "hot") return `bg-rzp ${ring}`;
   if (seat === "recovered") return `bg-moss ${ring}`;
   if (seat === "stopped") return `bg-[#c5d0de] ${ring}`;
-  if (seat === "parked") return `bg-[#f5a623] ${ring}`;
+  if (seat === "parked") return `bg-amber ${ring}`;
   return `bg-[#e4ebf3] ${ring}`;
 }
 

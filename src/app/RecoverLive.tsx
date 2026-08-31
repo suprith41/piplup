@@ -212,15 +212,15 @@ export function RecoverLive() {
     <section className="desk-card mt-8 p-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="mono text-[11px] uppercase tracking-wider text-moss">Live · Razorpay Test Mode</p>
-          <h2 className="mt-1 text-lg font-semibold">Create recovery Payment Links</h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-ink/65">
+          <p className="rzp-chip bg-[#fff4d6] text-[#8a5a00]">Live · Razorpay Test Mode</p>
+          <h2 className="mt-2 font-display text-lg tracking-tight">Create recovery Payment Links</h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-[#5a6178]">
             Eureka Labs students whose AI/ML subscription failed. Policy grants first. Silent retries and freezes do
             not get a link. Test accounts cap at {status?.cap ?? 30} Payment Links, so we mint until that ceiling and
             reuse any live ones.
           </p>
         </div>
-        <div className="mono text-right text-[11px] text-ink/45">
+        <div className="mono text-right text-[11px] text-[#8c93a3]">
           {status?.configured ? (
             <p>
               {status.testMode ? "test keys" : "not test mode"} · {status.keyPrefix}
@@ -233,7 +233,7 @@ export function RecoverLive() {
 
       <ul className="mt-4 flex flex-wrap gap-2 text-xs">
         {(status?.demo ?? []).map((d) => (
-          <li key={d.id} className="rounded border border-ink/10 px-2 py-1">
+          <li key={d.id} className="rounded-md border border-[#e6eaf2] bg-[#f8f9fc] px-2 py-1">
             <span className="mono">{d.id}</span> {d.name} · {d.decline} → {d.mutation}
           </li>
         ))}
@@ -244,7 +244,7 @@ export function RecoverLive() {
           type="button"
           disabled={busy || !status?.configured}
           onClick={() => void run(false)}
-          className="rounded border border-ink/20 px-4 py-2 text-sm disabled:opacity-40"
+          className="rzp-btn-ghost px-4 py-2 text-sm disabled:opacity-40"
         >
           {busy ? "Calling Razorpay…" : "Create 3 test links"}
         </button>
@@ -252,7 +252,7 @@ export function RecoverLive() {
           type="button"
           disabled={busy || !status?.configured}
           onClick={() => void run(false, true)}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+          className="rzp-btn px-4 py-2 text-sm disabled:opacity-40"
         >
           {busy
             ? "Calling Razorpay…"
@@ -262,7 +262,7 @@ export function RecoverLive() {
           type="button"
           disabled={busy || !status?.configured}
           onClick={() => void run(true)}
-          className="rounded border border-ink/20 px-4 py-2 text-sm disabled:opacity-40"
+          className="rzp-btn-ghost px-4 py-2 text-sm disabled:opacity-40"
         >
           Inject timeout
         </button>
@@ -270,7 +270,7 @@ export function RecoverLive() {
           type="button"
           disabled={!lastBatch}
           onClick={downloadBatch}
-          className="rounded border border-ink/20 px-4 py-2 text-sm disabled:opacity-40"
+          className="rzp-btn-ghost px-4 py-2 text-sm disabled:opacity-40"
         >
           Download last batch
         </button>
@@ -293,7 +293,7 @@ export function RecoverLive() {
                 type="button"
                 disabled={busy}
                 onClick={() => void markPaid(d.id)}
-                className="rounded border border-ink/20 px-3 py-1.5 text-xs disabled:opacity-40"
+                className="rzp-btn-ghost px-3 py-1.5 text-xs disabled:opacity-40"
               >
                 {paidIds.includes(d.id) ? `${d.name} paid` : `Mark ${d.name} paid`}
               </button>
@@ -345,7 +345,7 @@ export function RecoverLive() {
           type="button"
           disabled={mailBusy || !mailReady || picked.length === 0}
           onClick={() => void sendMail()}
-          className="mt-4 rounded-md bg-neutral-900 px-4 py-2 text-sm text-white disabled:opacity-40"
+          className="rzp-btn mt-4 px-4 py-2 text-sm disabled:opacity-40"
         >
           {mailBusy ? "Sending…" : `Send reminder (${picked.length})`}
         </button>
@@ -369,7 +369,7 @@ export function RecoverLive() {
                     {row.id} · {row.decline.replaceAll("_", " ")}
                   </span>
                 </p>
-                <a className="text-moss underline" href={row.shortUrl} target="_blank" rel="noreferrer">
+                <a className="rzp-link" href={row.shortUrl} target="_blank" rel="noreferrer">
                   {row.shortUrl}
                 </a>
               </li>
@@ -393,7 +393,7 @@ export function RecoverLive() {
                 <p className="mt-1 text-ink/70">{row.reason}</p>
                 {row.transcript ? <p className="mt-1 text-xs italic text-ink/50">“{row.transcript}”</p> : null}
                 {row.linkUrl ? (
-                  <a className="mt-1 inline-block text-moss underline" href={row.linkUrl} target="_blank" rel="noreferrer">
+                  <a className="rzp-link mt-1 inline-block" href={row.linkUrl} target="_blank" rel="noreferrer">
                     {row.linkUrl}
                   </a>
                 ) : null}
@@ -418,7 +418,7 @@ export function RecoverLive() {
                 <p className="mt-0.5 text-xs text-ink/45">{row.caseId}</p>
                 <p className="mt-1 text-ink/70">{row.reason}</p>
                 {row.link ? (
-                  <a className="mt-1 inline-block text-moss underline" href={row.link.shortUrl} target="_blank" rel="noreferrer">
+                  <a className="rzp-link mt-1 inline-block" href={row.link.shortUrl} target="_blank" rel="noreferrer">
                     {row.link.shortUrl}
                   </a>
                 ) : null}

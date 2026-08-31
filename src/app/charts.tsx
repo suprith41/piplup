@@ -141,7 +141,7 @@ export function StackedBars({
       </svg>
       {hover ? (
         <div
-          className="pointer-events-none absolute z-10 min-w-[160px] rounded-lg border border-[#e4ebf3] bg-white px-3 py-2 text-[11px] shadow-sm"
+          className="pointer-events-none absolute z-10 min-w-[160px] rounded-md border border-[#e6eaf2] bg-white px-3 py-2 text-[11px] shadow-lift"
           style={{ left: Math.min(hover.x, 420), top: Math.max(8, hover.y - 72) }}
         >
           <p className="font-medium text-ink">{rows[hover.i].label}</p>
