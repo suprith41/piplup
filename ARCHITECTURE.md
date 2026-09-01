@@ -5,7 +5,7 @@ Piplup is a **policy-gated recovery agent**, not a chatbot that retries payments
 ```
 decline event
     → parse inbound reply (Hinglish → typed intent)
-    → classify decline (code + mandate state + bank signal, not LLM)
+    → classify decline (code + mandate state + bank signal)
     → hard policy grant
     → clock: sync cascade | async dunning | terminal mutation | stop
     → mutate attempt (cooldown / next rail / wait / link / reauth / none)
@@ -137,14 +137,6 @@ NPCI slots per method, a by-bank breakdown, and paise spent per rupee recovered.
 
 "In recovery" is defined against an `asOfDay` cursor: a case whose next unskipped ladder step falls after that day
 has not failed, it simply has not been tried yet.
-
-## What the LLM may do
-
-Write Hinglish customer copy **after** the policy grant, and extract structured intent from an inbound reply. Extraction below 0.6 confidence is discarded.
-
-## What the LLM may not do
-
-Move money. Pick a clock. Override a stop. Spend an NPCI retry.
 
 ## Measurement
 

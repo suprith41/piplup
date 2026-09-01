@@ -42,7 +42,7 @@ export async function GET(request: Request) {
           send(ingressFor(c));
           await sleep(pace(i));
           if (request.signal.aborted) break;
-          const event = await actOnCase(c.id, live, { notify: false });
+          const event = await actOnCase(c.id, live);
           send({ type: "decision", event, index: i + 1, total: queue.length });
         }
 

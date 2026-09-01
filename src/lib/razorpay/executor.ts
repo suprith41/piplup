@@ -1,6 +1,6 @@
-import { appendLedger, latestHeardVoice } from "../recovery/ledger.ts";
+import { appendLedger } from "../recovery/ledger.ts";
 import { grantAdaptive } from "../recovery/policy.ts";
-import { applyVoiceOverlay, enrichWithReply } from "../recovery/reply.ts";
+import { enrichWithReply } from "../recovery/reply.ts";
 import { seedBatch } from "../recovery/seed.ts";
 import { exposurePaise } from "../recovery/simulate.ts";
 import type { RecoveryCase } from "../recovery/types.ts";
@@ -13,10 +13,7 @@ const LINK_MUTATIONS = new Set(["payment_link", "mandate_reauth"]);
 export const DEMO_CASE_IDS = ["rc_071", "rc_072", "rc_096"] as const;
 
 export function caseById(id: string): RecoveryCase | undefined {
-  const c = seedBatch().map(enrichWithReply).find((row) => row.id === id);
-  if (!c) return undefined;
-  const voice = latestHeardVoice(c.id);
-  return voice?.transcript ? applyVoiceOverlay(c, voice.transcript) : c;
+  return seedBatch().map(enrichWithReply).find((row) => row.id === id);
 }
 
 function logLink(line: Omit<AuditLine, "at">): AuditLine {
@@ -38,12 +35,9 @@ function logLink(line: Omit<AuditLine, "at">): AuditLine {
 
 export async function executeRecovery(
   caseId: string,
-  options: { injectTimeout?: boolean; force?: boolean; skipVoice?: boolean } = {},
+  options: { injectTimeout?: boolean; force?: boolean } = {},
 ): Promise<AuditLine> {
-  const c =
-    options.force || options.skipVoice
-      ? seedBatch().map(enrichWithReply).find((row) => row.id === caseId)
-      : caseById(caseId);
+  const c = caseById(caseId);
   if (!c) {
     return logLink({
       caseId,
@@ -161,7 +155,7 @@ export async function executeGrantedLinks(
   const needed = casesNeedingLinks();
   const rows: AuditLine[] = [];
   for (const row of needed) {
-    const result = await executeRecovery(row.id, { ...options, skipVoice: true });
+    const result = await executeRecovery(row.id, options);
     rows.push(result);
     if (result.outcome === "created") {
       await new Promise((resolve) => setTimeout(resolve, 400));
@@ -207,5 +201,3 @@ export function describeDemoCases(): Array<{ id: string; name: string; decline: 
     };
   });
 }
-
-export type { CreatedLink };

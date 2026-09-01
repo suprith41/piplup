@@ -1,6 +1,5 @@
 import { CHANNEL_COST_PAISE } from "./cost.ts";
 import { seedBatch } from "./seed.ts";
-import { classifyDecline } from "./taxonomy.ts";
 import type {
   RecoveryCase,
   RetryEnvelope,
@@ -136,7 +135,7 @@ function median(values: number[]): number {
  * has cleared on the 7th for three cycles running, stopping at the declaration
  * is how you present a debit into an empty account.
  */
-export function liquidityReads(c: RecoveryCase): LiquidityRead[] {
+function liquidityReads(c: RecoveryCase): LiquidityRead[] {
   const reads: LiquidityRead[] = [];
 
   const parsed = c.parsedReply;
@@ -379,15 +378,6 @@ export function planWindows(
   return { caseId: c.id, windows, chosen, explanation };
 }
 
-/** The single best slot, or null when nothing in the envelope is worth a debit. */
-export function bestWindow(
-  c: RecoveryCase,
-  envelope: RetryEnvelope = DEFAULT_ENVELOPE,
-  slotsAvailable = c.retryBudgetLeft,
-): ScheduledAttempt | null {
-  return planWindows(c, envelope, slotsAvailable).chosen[0] ?? null;
-}
-
 /**
  * Timing for an out-of-band ask — a link or a re-auth request.
  *
@@ -399,9 +389,4 @@ export function bestContactDay(c: RecoveryCase, envelope: RetryEnvelope = DEFAUL
   if (reads.length === 0) return c.billingDay;
   const strongest = reads.reduce((top, read) => (read.strength > top.strength ? read : top));
   return Math.min(Math.max(strongest.day, c.billingDay), envelope.dropDeadDay);
-}
-
-/** Only used by the grid view, which wants the case's own class label. */
-export function windowClass(c: RecoveryCase): string {
-  return classifyDecline(c);
 }

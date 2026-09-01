@@ -1,5 +1,6 @@
 import { quotaSnapshot } from "@/lib/email/quota";
-import { DEMO_INBOXES, mailStatus, sendReminders } from "@/lib/email/send";
+import { DEMO_INBOXES } from "@/lib/email/recipients";
+import { mailStatus, sendReminders } from "@/lib/email/send";
 
 export const dynamic = "force-dynamic";
 

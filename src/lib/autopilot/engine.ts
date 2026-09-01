@@ -1,52 +1,25 @@
-import { DEMO_INBOXES } from "../email/recipients.ts";
-import { mailStatus, sendReminders } from "../email/send.ts";
 import { eurekaCourse, railLabel } from "../merchant/eureka.ts";
 import { findLink, liveLinks } from "../razorpay/audit.ts";
 import { DEMO_CASE_IDS, executeRecovery } from "../razorpay/executor.ts";
-import { hinglishNudge } from "../recovery/copy.ts";
-import { isCasePaid, latestHeardVoice } from "../recovery/ledger.ts";
+import { isCasePaid } from "../recovery/ledger.ts";
 import { grantAdaptive, nextRail } from "../recovery/policy.ts";
-import { applyParsedReply, applyVoiceOverlay, enrichWithReply } from "../recovery/reply.ts";
+import { enrichWithReply } from "../recovery/reply.ts";
 import { seedBatch } from "../recovery/seed.ts";
 import { exposurePaise, runPolicy } from "../recovery/simulate.ts";
 import { formatINR } from "../recovery/taxonomy.ts";
-import type { ParsedReply, PolicyDecision, RecoveryCase } from "../recovery/types.ts";
+import type { PolicyDecision, RecoveryCase } from "../recovery/types.ts";
 import type { DeskEvent, IngressEvent, QueueItem } from "./types.ts";
-
-export type { DeskEvent, IngressEvent, QueueItem } from "./types.ts";
 
 const LIVE = new Set<string>(DEMO_CASE_IDS);
 
 /** Demo students first so the reviewer sees real Razorpay + mail in the opening seconds. */
 export function nightQueue(): RecoveryCase[] {
-  const all = seedBatch().map(enrichWithReply).map(withVoiceOverlay);
+  const all = seedBatch().map(enrichWithReply);
   const head = DEMO_CASE_IDS.map((id) => all.find((row) => row.id === id)).filter(
     (row): row is RecoveryCase => Boolean(row),
   );
   const rest = all.filter((row) => !LIVE.has(row.id));
   return [...head, ...rest];
-}
-
-function withVoiceOverlay(c: RecoveryCase): RecoveryCase {
-  const voice = latestHeardVoice(c.id);
-  if (!voice?.transcript) return c;
-
-  const parsed = parsedFromLedger(voice);
-  if (parsed) return applyParsedReply(c, parsed);
-  return applyVoiceOverlay(c, voice.transcript);
-}
-
-function parsedFromLedger(voice: { transcript?: string; intent?: string; confidence?: number; promisedDay?: number; source?: string }): ParsedReply | null {
-  const intents = new Set(["promise_to_pay", "already_paid", "dispute", "opt_out", "unclear"]);
-  if (!voice.transcript || !voice.intent || !intents.has(voice.intent)) return null;
-  if ((voice.confidence ?? 0) < 0.6) return null;
-  return {
-    raw: voice.transcript,
-    intent: voice.intent as ParsedReply["intent"],
-    promisedDay: voice.promisedDay,
-    confidence: voice.confidence ?? 0.6,
-    source: voice.source === "llm" ? "llm" : "rules",
-  };
 }
 
 export function queuePreview(): QueueItem[] {
@@ -86,11 +59,7 @@ export function ingressFor(c: RecoveryCase): IngressEvent {
   };
 }
 
-export async function actOnCase(
-  caseId: string,
-  live: boolean,
-  options: { notify?: boolean } = {},
-): Promise<DeskEvent> {
+export async function actOnCase(caseId: string, live: boolean): Promise<DeskEvent> {
   const c = nightQueue().find((row) => row.id === caseId);
   if (!c) {
     throw new Error(`Unknown case ${caseId}`);
@@ -100,21 +69,11 @@ export async function actOnCase(
   const score = runPolicy([c], "adaptive");
   const attempt = score.attempts[0];
   const isLiveTarget = live && LIVE.has(caseId);
-  const shouldNotify = options.notify === true;
 
   let linkUrl = findLink(caseId)?.shortUrl;
-  let emailed = false;
-  let emailError: string | undefined;
-
   if (isLiveTarget && decision.allowed) {
     const audit = await executeRecovery(caseId);
     linkUrl = audit.link?.shortUrl ?? linkUrl;
-    const inbox = DEMO_INBOXES.find((row) => row.caseId === caseId);
-    if (shouldNotify && inbox && mailStatus().configured && audit.outcome !== "failed") {
-      const sent = await sendReminders([inbox.email]);
-      emailed = Boolean(sent[0]?.ok);
-      emailError = sent[0]?.ok ? undefined : sent[0]?.error;
-    }
   }
 
   const recovered = isLiveTarget ? isCasePaid(caseId) : attempt.recovered;
@@ -122,12 +81,10 @@ export async function actOnCase(
   return deskEvent(c, decision, recovered, attempt.executed, {
     live: isLiveTarget,
     linkUrl,
-    emailed,
-    emailError,
   });
 }
 
-export function deskEvent(
+function deskEvent(
   c: RecoveryCase,
   decision: PolicyDecision,
   recovered: boolean,
@@ -168,12 +125,6 @@ export function deskEvent(
     scheduledHourIST: decision.scheduledHourIST,
     parsedIntent: c.parsedReply?.intent,
   };
-}
-
-export function previewNudge(caseId: string): string {
-  const c = nightQueue().find((row) => row.id === caseId);
-  if (!c) return "";
-  return hinglishNudge(c, grantAdaptive(c));
 }
 
 function webhookSource(c: RecoveryCase): string {

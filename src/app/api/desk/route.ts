@@ -1,4 +1,3 @@
-import { groqStatus } from "@/lib/llm/groq";
 import { queuePreview } from "@/lib/autopilot/engine";
 import { mailStatus } from "@/lib/email/send";
 import { EUREKA } from "@/lib/merchant/eureka";
@@ -15,7 +14,6 @@ export function GET() {
     merchant: EUREKA,
     razorpay: razorpayStatus(),
     mail: mailStatus(),
-    groq: groqStatus(),
     kpis: {
       atRisk: formatINR(Math.round(report.adaptive.rupeesAtRisk * 100)),
       recovered: formatINR(Math.round(report.adaptive.rupeesRecovered * 100)),
@@ -28,25 +26,4 @@ export function GET() {
     queue: queuePreview(),
     liveLinks: describeLiveLinks(),
   });
-}
-
-export async function POST(request: Request) {
-  const { actOnCase } = await import("@/lib/autopilot/engine");
-  const body = (await request.json().catch(() => ({}))) as {
-    caseId?: string;
-    live?: boolean;
-    notify?: boolean;
-  };
-  if (!body.caseId) {
-    return Response.json({ error: "caseId required" }, { status: 400 });
-  }
-  try {
-    const event = await actOnCase(body.caseId, body.live !== false, { notify: body.notify === true });
-    return Response.json({ event });
-  } catch (error) {
-    return Response.json(
-      { error: error instanceof Error ? error.message : "act failed" },
-      { status: 400 },
-    );
-  }
 }

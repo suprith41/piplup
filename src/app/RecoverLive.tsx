@@ -33,7 +33,6 @@ type LedgerLine = {
   mutation: string;
   outcome: string;
   reason: string;
-  transcript?: string;
   linkUrl?: string;
   error?: string;
 };
@@ -199,7 +198,6 @@ export function RecoverLive() {
           .join(" "),
       );
       await loadMail();
-      await loadLedger();
       await loadLedger();
     } catch (err) {
       setMailNote(err instanceof Error ? err.message : "send failed");
@@ -391,7 +389,6 @@ export function RecoverLive() {
                 </p>
                 <p className="mt-0.5 text-xs text-ink/45">{row.caseId}</p>
                 <p className="mt-1 text-ink/70">{row.reason}</p>
-                {row.transcript ? <p className="mt-1 text-xs italic text-ink/50">“{row.transcript}”</p> : null}
                 {row.linkUrl ? (
                   <a className="rzp-link mt-1 inline-block" href={row.linkUrl} target="_blank" rel="noreferrer">
                     {row.linkUrl}

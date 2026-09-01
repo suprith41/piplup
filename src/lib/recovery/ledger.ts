@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-export type LedgerKind = "link" | "mail" | "voice" | "webhook";
+export type LedgerKind = "link" | "mail" | "webhook";
 
 export interface LedgerEntry {
   at: string;
@@ -12,11 +12,6 @@ export interface LedgerEntry {
   granted: boolean;
   reason: string;
   outcome: string;
-  transcript?: string;
-  intent?: string;
-  confidence?: number;
-  promisedDay?: number;
-  source?: "rules" | "llm";
   linkUrl?: string;
   error?: string;
 }
@@ -75,13 +70,6 @@ export function appendLedger(line: Omit<LedgerEntry, "at">): LedgerEntry {
   rows.push(full);
   writeJson(LEDGER, rows);
   return full;
-}
-
-export function latestHeardVoice(caseId: string): LedgerEntry | undefined {
-  return readLedger()
-    .slice()
-    .reverse()
-    .find((row) => row.kind === "voice" && row.caseId === caseId && row.outcome === "heard");
 }
 
 export function isCasePaid(caseId: string): boolean {

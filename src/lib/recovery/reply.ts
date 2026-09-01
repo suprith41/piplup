@@ -1,4 +1,4 @@
-import type { ParsedReply, RecoveryCase, ReplyIntent } from "./types.ts";
+import type { ParsedReply, RecoveryCase } from "./types.ts";
 
 const OPT_OUT = /\b(stop|band karo|mat bhejo|unsubscribe|cancel kar|nahi chahiye)\b/i;
 const ALREADY_PAID = /\b(kar diya|ho gaya|paid|payment done|de diya)\b/i;
@@ -12,8 +12,7 @@ const MONTH_END = /\b(month end|mahine ke end|last week)\b/i;
  * Rule-based English / Hinglish reply parser.
  *
  * Deliberately conservative: anything it is not sure about comes back as
- * "unclear" with low confidence so the policy engine ignores it. The LLM
- * slice replaces the extraction, never the decision.
+ * "unclear" with low confidence so the policy engine ignores it.
  */
 export function parseReply(raw: string, billingDay: number): ParsedReply {
   const text = raw.trim();
@@ -55,7 +54,7 @@ function extractDay(text: string, billingDay: number): number | undefined {
   return day;
 }
 
-export function applyParsedReply(c: RecoveryCase, parsed: ParsedReply): RecoveryCase {
+function applyParsedReply(c: RecoveryCase, parsed: ParsedReply): RecoveryCase {
   const enriched: RecoveryCase = {
     ...c,
     customerReply: parsed.raw,
@@ -78,10 +77,6 @@ export function applyParsedReply(c: RecoveryCase, parsed: ParsedReply): Recovery
   return enriched;
 }
 
-export function applyVoiceOverlay(c: RecoveryCase, transcript: string): RecoveryCase {
-  return applyParsedReply(c, parseReply(transcript, c.billingDay));
-}
-
 /**
  * Turn an inbound message into structured state before policy runs.
  * Promise dates are derived here, not handed to us by the fixture.
@@ -89,15 +84,4 @@ export function applyVoiceOverlay(c: RecoveryCase, transcript: string): Recovery
 export function enrichWithReply(c: RecoveryCase): RecoveryCase {
   if (!c.customerReply) return c;
   return applyParsedReply(c, parseReply(c.customerReply, c.billingDay));
-}
-
-export function replyIntentLabel(intent: ReplyIntent): string {
-  const labels: Record<ReplyIntent, string> = {
-    promise_to_pay: "promise to pay",
-    already_paid: "claims paid",
-    dispute: "dispute",
-    opt_out: "opt out",
-    unclear: "unclear",
-  };
-  return labels[intent];
 }

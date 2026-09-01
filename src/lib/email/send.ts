@@ -3,7 +3,7 @@ import { findLink } from "../razorpay/audit.ts";
 import { appendLedger } from "../recovery/ledger.ts";
 import { mailToHtml, mailToText, punchyMail } from "./copy.ts";
 import { MAX_SENDS_PER_INBOX, remaining, recordSend, sentCount } from "./quota.ts";
-import { allowedInboxes, DEMO_INBOXES, type DemoInbox } from "./recipients.ts";
+import { allowedInboxes, type DemoInbox } from "./recipients.ts";
 
 export function mailStatus(): { configured: boolean; from: string } {
   const user = process.env.SMTP_USER ?? "";
@@ -125,5 +125,3 @@ export async function sendReminders(
 
   return results;
 }
-
-export { DEMO_INBOXES };

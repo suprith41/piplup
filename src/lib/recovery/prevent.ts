@@ -116,7 +116,7 @@ export function seedUpcoming(): UpcomingCharge[] {
   return charges;
 }
 
-export function scanUpcoming(charges: UpcomingCharge[] = seedUpcoming()): PreventiveAction[] {
+function scanUpcoming(charges: UpcomingCharge[] = seedUpcoming()): PreventiveAction[] {
   const actions: PreventiveAction[] = [];
 
   for (const charge of charges) {

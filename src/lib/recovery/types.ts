@@ -97,7 +97,7 @@ export interface ParsedReply {
   intent: ReplyIntent;
   promisedDay?: number;
   confidence: number;
-  source: "rules" | "llm";
+  source: "rules";
 }
 
 export interface RecoveryCase {

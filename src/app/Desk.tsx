@@ -72,7 +72,6 @@ type Boot = {
   merchant: typeof EUREKA;
   razorpay: { configured: boolean; testMode: boolean };
   mail: { configured: boolean };
-  groq: { configured: boolean; model: string };
   kpis: {
     atRisk: string;
     recovered: string;
@@ -383,7 +382,7 @@ export function Desk() {
     abort.current?.abort();
     abort.current = null;
     setRunning(false);
-    const tape = "Ada paused the night. Queue is frozen where it is.";
+    const tape = "Paused. Queue is frozen where it is.";
     setTape(tape);
     persist({ tape, done: true });
     saveNight({ ...snapshot.current, tape, done: true });
@@ -581,12 +580,6 @@ export function Desk() {
             queue={boot?.queue ?? []}
             liveLinks={boot?.liveLinks ?? []}
             mailNote={mailNote}
-            onVoice={(event) => {
-              setById((prev) => ({ ...prev, [event.caseId]: event }));
-              setFeed((prev) => [event, ...prev]);
-              setTape(`${event.name} · ${event.action}`);
-            }}
-            onVoiceNote={setTape}
           />
         ) : null}
         {tab === "students" ? (
@@ -753,8 +746,6 @@ function DeskFloor(props: {
   queue: QueueItem[];
   liveLinks: Array<{ id: string; name: string; decline: string; mutation: string; shortUrl: string }>;
   mailNote: string | null;
-  onVoice: (event: DeskEvent) => void;
-  onVoiceNote: (note: string) => void;
 }) {
   const {
     boot,
@@ -776,8 +767,6 @@ function DeskFloor(props: {
     queue,
     liveLinks,
     mailNote,
-    onVoice,
-    onVoiceNote,
   } = props;
 
   return (
@@ -815,8 +804,6 @@ function DeskFloor(props: {
             event={byId[row.id]}
             hot={hotId === row.id}
             mail={boot?.mail.configured ?? false}
-            onVoice={onVoice}
-            onVoiceNote={onVoiceNote}
           />
         ))}
       </section>
@@ -911,15 +898,11 @@ function LiveCard({
   event,
   hot,
   mail,
-  onVoice,
-  onVoiceNote,
 }: {
   row: QueueItem;
   event?: DeskEvent;
   hot: boolean;
   mail: boolean;
-  onVoice: (event: DeskEvent) => void;
-  onVoiceNote: (note: string) => void;
 }) {
   return (
     <article
@@ -955,7 +938,6 @@ function LiveCard({
           {event?.linkUrl ?? row.linkUrl}
         </a>
       ) : null}
-      <CallButton caseId={row.id} name={row.name} onVoice={onVoice} onVoiceNote={onVoiceNote} />
     </article>
   );
 }
@@ -1083,7 +1065,7 @@ function PromisesBoard({ queue, byId }: { queue: QueueItem[]; byId: Record<strin
         Inbound replies become a date, a freeze, or a broken promise. Policy waits. It does not guess.
       </p>
       {rows.length === 0 ? (
-        <p className="mt-8 text-sm text-[#8c93a3]">Promises land here as the night runs, or after a live call.</p>
+        <p className="mt-8 text-sm text-[#8c93a3]">Promises land here as the night runs.</p>
       ) : (
         <ul className="mt-6 divide-y divide-[#eef1f8]">
           {rows.map(({ row, event, status, day, quote }) => (
@@ -1123,175 +1105,6 @@ function promiseStatus(row: QueueItem, event?: DeskEvent): "waiting" | "honored"
   if (row.live && event && !event.stopped) return "waiting";
   if (event && !event.recovered && !event.stopped) return "broken";
   return promised ? "waiting" : null;
-}
-
-function CallButton({
-  caseId,
-  name,
-  onVoice,
-  onVoiceNote,
-}: {
-  caseId: string;
-  name: string;
-  onVoice: (event: DeskEvent) => void;
-  onVoiceNote: (note: string) => void;
-}) {
-  const [phase, setPhase] = useState<"idle" | "speaking" | "listening" | "busy">("idle");
-  const [note, setNote] = useState<string | null>(null);
-
-  function recognitionCtor() {
-    return typeof window !== "undefined" ? window.SpeechRecognition || window.webkitSpeechRecognition : undefined;
-  }
-
-  async function submitTranscript(transcript: string) {
-    const res = await fetch("/api/voice", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ caseId, transcript }),
-    });
-    const data = (await res.json()) as {
-      ignored?: boolean;
-      event?: DeskEvent | null;
-      parsed?: { intent: string };
-      error?: string;
-    };
-    if (!res.ok) throw new Error(data.error ?? "voice failed");
-    if (data.ignored || !data.event) {
-      setNote(`Heard “${transcript}” — too unclear to act.`);
-      return;
-    }
-    onVoice(data.event);
-    setNote(`Heard “${transcript}” → ${data.parsed?.intent.replaceAll("_", " ")}`);
-  }
-
-  async function listenAndSubmit() {
-    const Ctor = recognitionCtor();
-    if (!Ctor) {
-      setNote("Speech recognition needs Chrome or Edge.");
-      return;
-    }
-    setPhase("listening");
-    onVoiceNote(`Listening to ${name}…`);
-    const transcript = await listenOnce(Ctor);
-    if (!transcript) {
-      setNote("Didn't catch that. Tap Reply and speak.");
-      setPhase("idle");
-      return;
-    }
-    setPhase("busy");
-    await submitTranscript(transcript);
-    setPhase("idle");
-  }
-
-  async function call() {
-    if (!window.speechSynthesis) {
-      setNote("This browser has no speech synthesis. Use Chrome or Edge.");
-      return;
-    }
-
-    setPhase("busy");
-    setNote(null);
-    try {
-      const preview = await fetch(`/api/voice?caseId=${caseId}`).then((r) => r.json() as Promise<{ spoken?: string; error?: string }>);
-      const line = preview.spoken ?? "";
-      if (!line) {
-        setNote(preview.error ?? "Nothing to say.");
-        setPhase("idle");
-        return;
-      }
-
-      setPhase("speaking");
-      onVoiceNote(`Ada calling ${name}…`);
-      await speakHinglish(line);
-      await listenAndSubmit();
-    } catch (err) {
-      setNote(err instanceof Error ? err.message : "voice failed");
-      setPhase("idle");
-    }
-  }
-
-  const label = phase === "speaking" ? "Speaking…" : phase === "listening" ? "Listening…" : phase === "busy" ? "Calling…" : "Call";
-
-  return (
-    <div className="mt-3 flex flex-wrap items-center gap-2">
-      <button
-        type="button"
-        disabled={phase !== "idle"}
-        onClick={() => void call()}
-        className="rounded px-3 py-1.5 text-xs font-semibold text-rzp transition-colors duration-150 hover:bg-[#eef2ff] disabled:opacity-40"
-      >
-        {label}
-      </button>
-      <button
-        type="button"
-        disabled={phase !== "idle"}
-        onClick={() => void listenAndSubmit().catch((err) => setNote(err instanceof Error ? err.message : "voice failed"))}
-        className="rounded px-3 py-1.5 text-xs font-semibold text-rzp transition-colors duration-150 hover:bg-[#eef2ff] disabled:opacity-40"
-      >
-        Reply
-      </button>
-      {note ? <p className="basis-full text-xs text-[#5a6178]">{note}</p> : null}
-    </div>
-  );
-}
-
-function speakHinglish(text: string): Promise<void> {
-  return new Promise((resolve) => {
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "hi-IN";
-    const hindi = window.speechSynthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith("hi"));
-    if (hindi) utterance.voice = hindi;
-    utterance.onend = () => resolve();
-    utterance.onerror = () => resolve();
-    window.speechSynthesis.speak(utterance);
-  });
-}
-
-function listenOnce(Ctor: SpeechRecognitionConstructor): Promise<string> {
-  return new Promise((resolve) => {
-    const rec = new Ctor();
-    rec.lang = "hi-IN";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    let settled = false;
-    const finish = (text: string) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      try {
-        rec.stop();
-      } catch {
-        /* already stopped */
-      }
-      resolve(text);
-    };
-    const timer = window.setTimeout(() => finish(""), 8000);
-    rec.onresult = (event) => {
-      const said = event.results[0]?.[0]?.transcript ?? "";
-      finish(said);
-    };
-    rec.onerror = () => finish("");
-    rec.start();
-  });
-}
-
-type SpeechRecognitionConstructor = new () => {
-  lang: string;
-  interimResults: boolean;
-  maxAlternatives: number;
-  onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
-  onerror: (() => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-};
-
-declare global {
-  interface Window {
-    SpeechRecognition?: SpeechRecognitionConstructor;
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-  }
 }
 
 function HaltedList({ feed }: { feed: DeskEvent[] }) {

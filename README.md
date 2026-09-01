@@ -139,8 +139,6 @@ Customers answer in Hinglish. `parseReply` turns a free-text message into a type
 
 Two cases in the batch look like ordinary insufficient-funds failures and are only revealed as do-not-touch by their reply (`"ye charge galat hai"` and `"stop karo, mat bhejo"`). A policy that ignores inbound text retries both.
 
-The parser is rule-based today; the LLM slice replaces the extraction, never the decision.
-
 ## Env
 
 Copy `.env.example` to `.env.local` with **test-mode** keys (`rzp_test_…`). Live keys are refused.
