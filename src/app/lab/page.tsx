@@ -25,6 +25,10 @@ export default function LabPage() {
         <Link className="rzp-link" href="/">
           Eureka Labs revenue desk
         </Link>
+        . The map is{" "}
+        <Link className="rzp-link" href="/architecture">
+          architecture
+        </Link>
         .
       </p>
       <dl className="mt-8 grid gap-4 sm:grid-cols-3">

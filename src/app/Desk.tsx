@@ -476,7 +476,10 @@ export function Desk() {
         <div className="border-t border-[#e6eaf2] px-5 py-4">
           <p className="rzp-chip bg-[#fff4d6] text-[#8a5a00]">TEST MODE</p>
           <p className="mt-2 text-[11px] leading-4 text-[#8c93a3]">UPI AutoPay · eNACH · cards</p>
-          <Link className="rzp-link mt-3 inline-block text-[12px]" href="/lab">
+          <Link className="rzp-link mt-3 inline-block text-[12px]" href="/architecture">
+            Architecture →
+          </Link>
+          <Link className="rzp-link mt-1 inline-block text-[12px]" href="/lab">
             Developer lab →
           </Link>
         </div>

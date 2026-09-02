@@ -1,31 +1,107 @@
 # Architecture
 
-Piplup is a **policy-gated recovery agent**, not a chatbot that retries payments.
+Piplup is a **policy-gated recovery agent** for [Razorpay AI Buildathon](https://razorpay.com/buildathon/) Track 03 — AI Revenue Recovery. It is not a chatbot that retries payments.
 
-```
-decline event
-    → parse inbound reply (Hinglish → typed intent)
-    → classify decline (code + mandate state + bank signal)
-    → hard policy grant
-    → clock: sync cascade | async dunning | terminal mutation | stop
-    → mutate attempt (cooldown / next rail / wait / link / reauth / none)
-    → score every window in the envelope, take the best day *and hour*
-    → NPCI budget guard (1 original + 3 retries)
-    → RBI pre-debit notice gate
-    → bounded ladder (day / hour / channel / price, with a hard stop)
-    → executor
-    → append-only decision log
-    → evaluate vs T+3 baseline (lift, net of cost, refusals)
+Demo merchant: **Eureka Labs** (Hyderabad). Product: monthly AI/ML course AutoPays. Book: **112 labeled failures** out of 1,240 billed seats in Cycle 47.
+
+The night loop recovers money that already bounced. A second, earlier loop flags next cycle’s debits that are already guaranteed to fail.
+
+Screen-share this file, or open the same diagram at [`/architecture`](http://localhost:3000/architecture) while `npm run dev` is running.
+
+## System map
+
+Two loops. Same policy gate. Money does not move unless `grantAdaptive` allows it.
+
+```mermaid
+flowchart TB
+  subgraph night["Night loop — something already failed"]
+    A[Razorpay decline / inbound reply] --> B[parseReply · Hinglish to intent]
+    B --> C[classifyDecline · code + mandate + bank]
+    C --> D{grantAdaptive}
+    D -->|stop| E[Freeze · no debit · no message]
+    D -->|sync_cascade| F[Hold 8s or switch rail]
+    D -->|async_dunning| G[Score day × hour · link / retry / sweep]
+    D -->|terminal_mutation| H[Ask for a fresh AutoPay · 0 NPCI slots]
+    F --> I[NPCI budget 1+3]
+    G --> I
+    H --> J[Out of band · 0 slots]
+    E --> K[Bounded ladder · day / hour / channel / price]
+    I --> K
+    J --> K
+    K --> L[Executor · test-mode Payment Link / email]
+    L --> M[Append-only decision log]
+    M --> N[evaluate vs T+3 · lift · cost · refusals]
+  end
+
+  subgraph dawn["Dawn loop — before anything is charged"]
+    P[Upcoming invoice] --> Q{Ceiling or expiry already broken?}
+    Q -->|yes| R[Notice 3 days out · 0 NPCI slots]
+    Q -->|no| S[Leave the billing day alone]
+  end
 ```
 
-A second, earlier loop runs on next cycle's book before anything is charged:
+Read the night loop left to right as: **see why it failed → decide if we are allowed to act → change the next attempt → spend an NPCI slot only if the debit can work → write the decision down → prove it against T+3.**
 
+## Where each tool sits
+
+This is the AI-judgment diagram. An LLM does not classify declines and does not grant money.
+
+## AI layer — the only place a model is allowed
+
+The implementable slot is **step 2: read the student’s message**. Everything after that stays rules.
+
+| | |
+| --- | --- |
+| **Sits on** | Raw inbound text (Hinglish / English) |
+| **Returns** | `promise_to_pay` · `dispute` · `already_paid` · `opt_out` · `unclear`, plus a day if they promised one, plus a confidence |
+| **Guard** | Confidence below 0.6 → ignore. Same as today’s rules. |
+| **Fallback** | [`reply.ts`](src/lib/recovery/reply.ts) regex if the model is down |
+| **Never** | Classify the decline. Never call `grantAdaptive`. Never spend an NPCI slot. |
+
+That is the layer a judge can see on `/architecture` (the card marked **AI**). Today the regex already does the job on the seeded book. Wiring Groq/OpenAI is a drop-in behind the same types — not a new money path.
+
+Screen-share the full-viewport poster at [`/architecture`](http://localhost:3000/architecture) (press F11). Do not record the Excalidraw strip.
+
+```mermaid
+flowchart LR
+  subgraph rules["Rules — must not hallucinate"]
+    R1[Decline class]
+    R2[Policy grant]
+    R3[Contact freeze]
+    R4[RBI 24h notice]
+    R5[Domestic-card: link only]
+  end
+
+  subgraph scored["Scored model — Stripe method, small book"]
+    S1[Day × hour grid]
+    S2[Five signal families]
+    S3[Leave-one-out base rate]
+    S4[EV floor before spending a slot]
+  end
+
+  subgraph arith["Arithmetic — not a prediction"]
+    A1[Invoice vs mandate ceiling]
+    A2[Card / mandate expiry vs billing day]
+  end
+
+  rules --> scored
+  scored --> arith
 ```
-upcoming charge
-    → mandate ceiling vs invoice amount
-    → mandate / card expiry vs billing date
-    → preventive notice, 3 days out, zero NPCI slots
-```
+
+| Layer | File | What a human is allowed to trust it with |
+| --- | --- | --- |
+| Reply parse | [`src/lib/recovery/reply.ts`](src/lib/recovery/reply.ts) | Hinglish → promise / dispute / paid / opt-out. Confidence &lt; 0.6 is ignored. |
+| Taxonomy | [`src/lib/recovery/taxonomy.ts`](src/lib/recovery/taxonomy.ts) | Six decline classes. Never inferred by a language model. |
+| Grant | [`src/lib/recovery/policy.ts`](src/lib/recovery/policy.ts) | The only door money can walk through. |
+| Windows | [`src/lib/recovery/windows.ts`](src/lib/recovery/windows.ts) | When to present. Readable log-odds, not a black box. |
+| Ladder | [`src/lib/recovery/ladder.ts`](src/lib/recovery/ladder.ts) | The whole cycle, priced. Guardrails live here. |
+| Baseline | [`src/lib/recovery/baseline.ts`](src/lib/recovery/baseline.ts) | T+3 all, and T+3 that stops after a hard decline. |
+| Simulate | [`src/lib/recovery/simulate.ts`](src/lib/recovery/simulate.ts) | What would have cleared, used only to score. |
+| Evaluate | [`src/lib/recovery/evaluate.ts`](src/lib/recovery/evaluate.ts) | Incremental lift, net of cost, correct refusals. |
+| Prevent | [`src/lib/recovery/prevent.ts`](src/lib/recovery/prevent.ts) | Failures that are already certain, three days out. |
+| Analytics | [`src/lib/recovery/analytics.ts`](src/lib/recovery/analytics.ts) | Same book the desk ran. No second pipeline. |
+| Executor | [`src/lib/razorpay/executor.ts`](src/lib/razorpay/executor.ts) | Test-mode links only. Live keys refused. |
+| Desk | [`src/app/Desk.tsx`](src/app/Desk.tsx) | What Ada sees: Payments, Customers, Settlements, Disputes, Reports, Smart Prevent. |
 
 ## Three ways to act, plus a freeze
 
@@ -35,6 +111,19 @@ upcoming charge
 | Async dunning | Financial / instrument / checkout | Smart Retries | Score every day × hour window and present at the best one. Domestic card means a link, never a silent charge. |
 | Terminal mutation | Mandate revoked | — | The debit is over, the customer is not. Ask for a fresh AutoPay. **Costs zero NPCI slots.** |
 | Stop | Chargeback / opt-out / already paid | Excessive-retry prevention | No debit and no message. Counts as a correct decision. |
+
+## Six decline classes on the 112-case book
+
+| Class | n | What it means | Mutation |
+| --- | --- | --- | --- |
+| Technical | 25 | Bank slow or bank down — two opposite fixes | Hold 8s **or** switch rail |
+| Financial | 26 | Empty account until payday, including the hour salary posts | Wait, then debit or link |
+| Instrument | 15 | Expired card or paused mandate | Link or re-auth — do not replay the dead tool |
+| Terminal | 31 | Revoked mandate, chargeback, opt-out, already paid | Re-auth **or** freeze |
+| Behavioral | 5 | Checkout abandoned | Payment link only |
+| Uncollected | 10 | Revived subscription, invoices never charged | Sweep invoices |
+
+T+3 treats most of these as “failed, retry tomorrow.” The mix is ugly on purpose so a single retry trick cannot fake the scoreboard.
 
 ## When to present: the window model
 
@@ -140,7 +229,7 @@ has not failed, it simply has not been tried yet.
 
 ## Measurement
 
-Three numbers no competitor publishes:
+The Track 03 bar is measured money recovered across a batch, with stopping rules and an audit trail. The harness is how we show it.
 
 | Metric | Why it exists |
 | --- | --- |
@@ -149,12 +238,28 @@ Three numbers no competitor publishes:
 | Correct refusals | Money we deliberately did not chase, and NPCI slots saved |
 | NPCI debits vs out-of-band | Recovering with a link is not the same as spending a mandate retry, so they are counted separately |
 
+`npm run evaluate` prints Adaptive against **T+3 all** and **T+3 charitable**. Lift has to survive both. The uncollected-invoice sweep is reported as its own share of incremental lift, because the calendar flow has no path to that money at all.
+
+## Desk surfaces, mapped to the engine
+
+| Tab | What Ada is looking at | Engine box it proves |
+| --- | --- | --- |
+| Payments | Tonight’s 112: incoming tape, decisions, lift vs T+3 | Ingress → grant → log |
+| Customers | Roster: bank, decline, next action, NPCI spent | Audit trail per seat |
+| Settlements | Inbound replies that became a date, a freeze, or a broken promise | `parseReply` before policy |
+| Disputes | Cases we left alone on purpose. T+3 still hammers them. Revoked mandates are not here. | Clock = `stop` |
+| Reports | Recovered / still open / closed unpaid, method, decline, bank, cost | Same book as `evaluate` |
+| Smart Prevent | Next cycle, flagged three days out, zero slots | Dawn loop |
+| `/lab` | Timing grid, ladder vs T+3, live link mint | Windows + cost model |
+| `/architecture` | This document, on one screen | The map |
+
 ## What we refuse to fake
 
 - ISO 8583 payload mutation
 - Visa / Mastercard Card Account Updater
 - A real cross-merchant card graph
 - 3DS exemption
+- An LLM on classify-or-debit
 
 The seed file includes a **synthetic** “instrument succeeded elsewhere” signal so the *method* is testable. The README says it is synthetic.
 
@@ -166,3 +271,11 @@ The seed file includes a **synthetic** “instrument succeeded elsewhere” sign
 
 Live silent UPI debit, a real phone rail (Twilio / Exotel), the WhatsApp Business API, and B2B receivables
 ageing. Channel cost is modelled for WhatsApp and SMS; only email is actually sent.
+
+## How a reviewer walks this
+
+1. Read this file (or `/architecture`) for the two loops and the grant gate.
+2. Run `npm run evaluate` — same 112 cases, two T+3 readings, Adaptive.
+3. Open `/` and watch Cycle 47 land on the desk.
+4. Open Disputes to see a correct freeze, then Reports for measured volume.
+5. Open `/lab` for the timing grid and the ladder next to T+3.

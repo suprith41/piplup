@@ -151,4 +151,9 @@ That mints three Test Mode Payment Links (expired card, paused mandate, checkout
 
 ## Docs
 
-[ARCHITECTURE.md](./ARCHITECTURE.md)
+- [ARCHITECTURE.md](./ARCHITECTURE.md) — two loops, grant gate, file map. Same diagram at [`/architecture`](http://localhost:3000/architecture).
+- [DEMO.md](./DEMO.md) — 5-minute pitch shot list. Not a script.
+
+## Pitch video
+
+Track 03 wants measured recovery across a batch, stopping rules, and an audit trail. Record against `/architecture` first, then the desk, then `/lab`. Follow [DEMO.md](./DEMO.md).
