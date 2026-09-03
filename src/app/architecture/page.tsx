@@ -54,7 +54,7 @@ export default function ArchitecturePage() {
         <HArrow label="into" />
 
         <Frame title="2 · PIPLUP PICKS ONE">
-          <div className="grid h-full min-h-0 w-full grid-cols-[4.25rem_2.25rem_minmax(0,1fr)]">
+          <div className="grid h-full min-h-0 w-full grid-cols-[4.25rem_2.25rem_minmax(0,1fr)] overflow-hidden">
             <div className="flex items-center justify-center">
               <div className="flex h-[4.4rem] w-[4.4rem] flex-col items-center justify-center rounded-full bg-[#305eff] text-center text-white">
                 <p className="text-[13px] leading-none">PIPLUP</p>
@@ -122,12 +122,12 @@ export default function ArchitecturePage() {
 function Frame({ title, children, span }: { title: string; children: ReactNode; span?: boolean }) {
   return (
     <section
-      className={`flex min-h-0 min-w-0 flex-col overflow-visible rounded-2xl border border-[#c5cad6] bg-white px-2.5 py-2 ${
+      className={`flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-[#c5cad6] bg-white px-2.5 pb-2 pt-2 ${
         span ? "col-span-3" : ""
       }`}
     >
-      <p className="mb-1.5 shrink-0 text-[11px] uppercase tracking-[0.14em] text-[#8c93a3]">{title}</p>
-      <div className="flex min-h-0 min-w-0 flex-1">{children}</div>
+      <p className="relative z-10 mb-2 shrink-0 bg-white px-0.5 text-[15px] leading-none text-[#02042b]">{title}</p>
+      <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">{children}</div>
     </section>
   );
 }
@@ -135,10 +135,10 @@ function Frame({ title, children, span }: { title: string; children: ReactNode; 
 function VFlow({ children }: { children: ReactNode }) {
   const items = Children.toArray(children);
   return (
-    <div className="flex h-full w-full flex-col justify-center">
+    <div className="flex h-full min-h-0 w-full flex-col">
       {items.map((child, i) => (
-        <div key={i} className="w-full shrink-0">
-          <div className="h-[5.6rem] w-full">{child}</div>
+        <div key={i} className="flex min-h-0 w-full flex-1 flex-col">
+          <div className="min-h-0 w-full flex-1">{child}</div>
           {i < items.length - 1 ? <VJoin /> : null}
         </div>
       ))}
