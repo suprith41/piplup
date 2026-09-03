@@ -1,19 +1,10 @@
 # Piplup
 
-Track 03 — AI Revenue Recovery for the [Razorpay AI Buildathon](https://razorpay.com/buildathon/).
+Policy-gated **AI revenue recovery** for Indian recurring payments.
 
-Stripe-grade recovery intelligence on **Razorpay's Indian rails**, demoed as the recovery desk for **Eureka Labs** — an online AI/ML course subscription. Not a retry bot.
+Built for [Razorpay AI Buildathon](https://razorpay.com/buildathon/) Track 03. Demo merchant: **Eureka Labs** — monthly AI/ML course AutoPays in Hyderabad. Book: **112 labeled failures** out of 1,240 billed seats.
 
-- Type the decline first.
-- Mutate the next attempt. Do not replay the same debit.
-- Cascade *now* if the bank is down; hold a few seconds if the bank is merely slow.
-- Dunning *later* if it is money — and at the right **hour**, not just the right day. A payday debit presented in the 02:00 batch bounces against yesterday's balance.
-- Treat the **NPCI budget (1 original + 3 retries)** as the scarce resource. A revoked mandate gets a re-auth ask, not a retry.
-- Score it against a Razorpay-style **T+3 calendar** on the same 112 labeled cases.
-
-We do **not** fake ISO 8583 Adaptive Acceptance or a global card graph. Those need issuer pipes. The method is what we port; the rails are Indian.
-
-## Run
+A failed AutoPay is not one problem. Razorpay’s public retry model treats most of them as “try again tomorrow” (T+1, T+2, T+3). Piplup reads *why* it bounced, then changes the next move — or correctly refuses to debit.
 
 ```bash
 npm install
@@ -21,159 +12,140 @@ npm run evaluate
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+`npm run evaluate` runs Adaptive Recovery and two T+3 baselines on the same 112 cases. Open [http://localhost:3000](http://localhost:3000) for the desk, [`/lab`](http://localhost:3000/lab) for the timing grid, [`/architecture`](http://localhost:3000/architecture) for the system map.
 
-## Repo map
+---
 
-Routes stay in `src/app`. Everything a reviewer actually reads lives next to its job.
+## What we built
+
+A recovery **agent**, not a chatbot and not a retry cron.
+
+| Surface | What it is |
+| --- | --- |
+| **Policy engine** | Classifies the decline, grants one clock (cascade / dunning / re-auth / stop), and will not spend an NPCI slot unless the debit can work. |
+| **Window model** | Scores every day × hour inside a merchant envelope and picks when to present — Stripe Smart Retries, on a 112-case book. |
+| **Ladder** | Expands the grant into a priced cycle: day, hour, channel, quiet hours, 3-message cap, hard stop. |
+| **A/B harness** | Same batch through Adaptive and T+3. Reports incremental lift, chase cost, NPCI spend, and correct refusals. |
+| **Revenue desk** | Payments, Customers, Settlements, Disputes, Reports, Smart Prevent — what Ada sees on the night the book lands. |
+| **Prevention** | Next cycle, scanned *before* anything is charged. Invoice above mandate ceiling, or a card that lapses before billing day — arithmetic, not a prediction. |
+
+Live action is **test-mode Payment Links and email** only. Live Razorpay keys are refused.
+
+---
+
+## What we took from Stripe — and what we had to rebuild
+
+Stripe’s [Smart Retries](https://stripe.com/blog/how-we-built-it-smart-retries) replaced a fixed dunning calendar with a model that scores candidate retry windows. The merchant sets the envelope (drop-dead day, max attempts, final action). The model picks the time *inside* it. Default on cards: **8 tries in 2 weeks**.
+
+We ported that **split**, not Stripe’s model.
+
+| Stripe | What we implemented |
+| --- | --- |
+| Fixed schedule → scored windows | Exhaustive search over the day × hour grid (`src/lib/recovery/windows.ts`) |
+| 500+ features in five families | Five signals a Razorpay merchant already holds: payday, promise-to-pay, prior clear days, decline-code base rate, rail + hour |
+| Heavy network model | Additive log-odds on 112 labeled cases, leave-one-out base rates so a case never scores itself |
+| Retry until the budget runs out | Spend a slot only if expected value clears a floor |
+| Merchant envelope, model interior | Same — except **NPCI already capped a mandate at 1 original + 3 retries**, so `maxAttempts` can only go lower than four |
+| Published default | `sweepEnvelopes()` ranks 15 envelopes; this book’s best is **14 days × 2 attempts** |
+
+The hour is the India-specific load-bearing signal. Indian payroll posts in the morning clearing batch. A debit presented at **02:00 on payday** is presented against yesterday’s balance — the right date, the wrong time. A T+3 calendar presents at 02:00 every time.
+
+We did not fake Visa/Mastercard Adaptive Acceptance, a card account updater, or a cross-merchant graph. Those need issuer pipes. The method is what ports; the rails are Indian.
+
+---
+
+## How a decision is made
 
 ```
-src/
-  lib/recovery/        engine — grant, windows, ladder, evaluate
-  lib/razorpay/        test-mode Payment Links + webhook ledger
-  lib/autopilot/       night queue that drives the desk
-  lib/email/           reminder copy + send
-  lib/merchant/        Eureka Labs fixture
-  components/desk/     Ada's dashboard (one file per tab body)
-  components/insights/ Reports + Smart Prevent
-  components/lab/      timing grid, ladder vs T+3, live mint
-  app/                 `/`, `/lab`, `/architecture`, APIs only
-scripts/evaluate.ts    A/B harness on the 112-case book
+fail → parse reply → classify → grant → mutate → spend an NPCI slot only if it can work → log → score vs T+3
 ```
 
-Start at [`src/lib/recovery/policy.ts`](src/lib/recovery/policy.ts) (the grant gate) and [`scripts/evaluate.ts`](scripts/evaluate.ts) (the proof). The file table in [ARCHITECTURE.md](./ARCHITECTURE.md) maps each box to a path.
+1. **Read the text.** `parseReply` turns Hinglish / English into `promise_to_pay`, `dispute`, `already_paid`, `opt_out`, or `unclear`. Confidence below 0.6 is ignored. This is the only AI-shaped slot; it never classifies the decline and never grants money.
+2. **Name the why.** Six classes: technical, financial, instrument, terminal, behavioral, uncollected. Rules, not a model.
+3. **Grant one clock.** `grantAdaptive` in [`src/lib/recovery/policy.ts`](src/lib/recovery/policy.ts) is the only door a debit can walk through.
+4. **Change the next attempt.** Hold 8s on a slow switch; cascade if core banking is down; wait for payday *and* the hour if it is money; send a link if the instrument is dead; ask for a fresh AutoPay if the mandate is revoked; freeze on dispute / opt-out / already paid.
+5. **Prove it.** Incremental lift vs T+3, net of chase cost, NPCI slots saved, refusals counted as correct decisions.
 
-## What `npm run evaluate` proves
+A revoked mandate spends **zero** slots. The debit is dead; the customer is not. Exhausting the NPCI budget downgrades to a Payment Link rather than ending recovery.
 
-On the seeded batch, Adaptive Recovery should:
+---
 
-- recover more rupees than T+3
-- spend fewer NPCI debits doing it
-- waste zero slots on revoked / chargeback / opt-out cases
-
-That is Stripe’s published shape (more recovery, fewer attempts), implemented as an India-rail agent.
-
-## The three Indian constraints the engine is built around
+## Indian constraints the engine is built around
 
 | Constraint | What the engine does |
 | --- | --- |
-| **NPCI caps mandate debits** at 1 original + 3 retries | Every decision carries `npciSlotsUsed`. Only same-rail retry, cooldown retry and rail cascade spend from it. A revoked mandate spends **zero** and gets a re-auth ask instead, because the debit is dead but the customer is not. Exhausting the budget downgrades to a link rather than ending recovery. |
-| **Bank downtime is not one thing** | A slow switch clears if you hold ~8s and re-present the same rail; the backup rail is behind the same bank and is just as slow. Core banking being down is the reverse. The seed labels both, so a policy that always cascades loses the first group and one that always waits loses the second. |
-| **RBI and domestic-card rules** | A debit moved to a new date needs a fresh 24h pre-debit notice, which can push the debit a day later. Indian domestic cards cannot be manually charged at all, so those cases only ever get a customer-completed link. |
+| **NPCI** — 1 original + 3 retries | `npciSlotsUsed` on every decision. Links, re-auth, and invoice sweeps are out of band. |
+| **Bank ≠ rail** | Latency spike → hold and re-present the same rail. CBS down → switch rail. Always cascading loses one group; always waiting loses the other. |
+| **RBI 24h pre-debit notice** | Moving a debit to a new date can push it a day later (`applyPreDebitNotice`). |
+| **Domestic cards** | Razorpay does not allow a merchant-initiated charge. Those cases only ever get a customer-completed link. |
 
-## When to present
+---
 
-Stripe's [Smart Retries](https://stripe.com/blog/how-we-built-it-smart-retries) replaced a fixed dunning schedule with a model that scores candidate retry windows. We port the method, not the model — we have 112 labelled cases, not billions of payments, and say so.
+## What `npm run evaluate` prints
 
-Every day × hour window inside the merchant's envelope gets scored additively in log-odds, so the pick can be read back off the decision instead of taken on trust. Signals sit in Stripe's five families and every one is something a Razorpay merchant already holds: declared payday, promise-to-pay parsed from the reply, the days this customer's debit cleared in previous cycles, the decline code's measured base rate, the rail, and the hour.
+Same 112 cases. Adaptive has to beat **T+3 all** (retries every class, including revoked mandates) *and* **T+3 charitable** (stops after one hard decline). Lift that only exists against the harsher reading is not real.
 
-The hour is the part that is specific to us. Indian payroll posts in the morning clearing batch, so a debit presented at 02:00 on payday is presented against yesterday's balance — the right date and the wrong time. A calendar cycle presents at 02:00 every time.
+On this book:
 
-The merchant sets the boundary and the model picks inside it, exactly as Stripe splits it — except NPCI already fixed the ceiling, so `maxAttempts` can only ever go lower than four. `npm run evaluate` sweeps 15 envelopes over the whole batch and ranks them; on this book the best is **14 days × 2 attempts**, the same two-week window Stripe recommends at a fraction of the attempts. A third attempt recovers nothing more and costs a slot.
+| | T+3 | Adaptive |
+| --- | --- | --- |
+| Recovered | ₹17,178 | **₹69,105** |
+| Recovery rate | 20% | **78%** |
+| NPCI debits | 270 | **45** |
+| Incremental lift | — | **₹51,927** (65 cases the calendar does not win) |
+| Slots wasted on dead mandates | 31 | **0** |
 
-`/lab` renders the scored grid for two cases with the chosen windows ringed and the log-odds terms printed underneath.
+A third attempt recovers nothing more and costs a slot, which is why the shipped envelope is 14 days × 2 — Stripe’s two-week window, at a fraction of the attempts, because NPCI granted four and card rails grant eight.
 
-## The bounded workflow
+Uncollected invoices on *revived* subscriptions (Razorpay will not auto-charge them) are reported as their own share of lift, because the calendar has no path to that money.
 
-A policy decides once. A workflow runs for days and has to know when to stop.
+---
 
-Every case gets an explicit ladder — day, hour, action, channel, price — generated from the grant and shown on `/lab` next to the calendar's ladder for the same customer. Guardrails are part of the object, not a promise in a README: contact only at 10:00 IST, quiet hours 21:00–09:00, at most 3 outbound messages per cycle, and a hard stop with a date on it.
+## Product
 
-The ladder is also the **cost model**. Both policies are priced off the steps they actually ran, so the outreach spend in the scoreboard is the sum of the steps you can read on screen. Steps the ladder planned and never sent — because the money landed on step one — are greyed out and cost nothing. There is no second source of truth to reconcile.
-
-## Recovery analytics
-
-Stripe publishes a [recovery dashboard](https://docs.stripe.com/billing/revenue-recovery/recovery-analytics); the **Analytics** tab is that dashboard on Indian rails. Failure rate, recovery rate by volume, and the recovered / **in recovery** / not-recovered split, where "in recovery" is money whose next scheduled action has not come round yet — counting it as lost would flatter the recovery rate, counting it as won would be a lie.
-
-Two things Stripe reports differently and two it does not report at all:
-
-- **Recovered volume by method.** Stripe buckets this three ways (retries, emails, other). Ours splits into the six moves the policy can actually make, each with the NPCI slots it consumed. Half the recovered volume comes from methods that spend **zero** slots.
-- **Failed volume by decline reason**, with the recovery rate per reason, so a policy that is good at timeouts and bad at revoked mandates cannot hide behind an average.
-- **By sponsor bank** — not a Stripe concept, but the one that matters when a bank's core banking system decides your Tuesday.
-- **Cost of the chase**, in paise spent per rupee recovered. Nobody publishes this, because gross recovery reads better.
-
-## Prevention: the debit that never fails
-
-Stripe emails a customer a month before their card expires. India has no card account updater, so the same idea has to work harder — and it turns out it can work with certainty rather than prediction.
-
-A UPI AutoPay mandate is approved **up to a ceiling**. If this cycle's invoice is larger than that ceiling, the debit *cannot* clear. That is arithmetic, not a model. Same for a mandate or card that lapses before the billing date. The **Prevent** tab scans next cycle's book before anything is charged and flags every debit that is already guaranteed to fail, three days out, for the price of a WhatsApp message and zero NPCI slots.
-
-The calendar finds these on the billing day and then spends its entire retry budget rediscovering that one number is bigger than another.
-
-## Prior art
-
-Failed-payment recovery is an established category. This project does not claim to invent it.
-
-| Product | What it does |
+| Route | What a reviewer is looking at |
 | --- | --- |
-| [SubsShield](https://subsshield.com/) | India-only dunning for Razorpay and Cashfree. Reads the decline reason and matches the WhatsApp message to the cause. |
-| [RecurringIQ](https://www.recurringiq.com/) | Deterministic scoring engine with failure-type-specific retry windows (24h network, 48h NSF, 72h bank decline). |
-| [DemandPay](https://demandpay.in/) | Collections agent across WhatsApp, RCS and voice, with promise-to-pay tracking. |
-| [Churnkey](https://churnkey.co/) / Butter Payments | US equivalents. ML retries plus outreach; Butter adds human callers. |
-| Razorpay Intelligent Retry Engine | Razorpay's own configurable retry cadence and WhatsApp recovery links (beta, FTX 2026). |
+| `/` | Night desk — incoming tape, decisions, lift vs T+3 |
+| Settlements / Disputes | Inbound promises and cases we left alone on purpose |
+| Reports | Recovered / in recovery / not recovered, by method, decline, bank, cost |
+| Smart Prevent | Next cycle, flagged three days out, zero slots |
+| `/lab` | Scored timing grid + Adaptive ladder next to T+3 |
+| `/architecture` | The two loops and the grant gate |
 
-**What Piplup adds.** Every product above advertises a recovery rate — 89%, 72%, 55-70% — and none publishes the method behind it. There is no baseline, no batch, no way to check the arithmetic.
+---
 
-Piplup ships the measurement instead of the claim:
-
-1. **A reproducible A/B harness.** One command runs the same 112 labeled cases through a calendar T+3 baseline and through Adaptive Recovery, and prints both. Clone it and verify the numbers yourself.
-2. **Incremental lift, not gross recovery.** Cases the calendar would have won anyway do not count as ours. The harness reports adaptive-only wins, cases neither policy could save, and regressions where the baseline beat us.
-3. **Net of chase cost.** Every message, notice and retry has a price. Gross recovery ignores it; we subtract it. Calendar retries look cheap until you count the failure emails they trigger.
-4. **Recovery that happens before the failure.** Every product on that list starts working after a debit has already failed and a slot is already gone. The prevention scan works the cycle before, on failures that are arithmetically certain rather than predicted.
-5. **Refusal as a reported metric.** Recovery tools sell upside. None of them report the money they correctly *declined* to chase, even though burning NPCI retry slots on revoked mandates is the real failure mode. Here, a correct refusal scores as a win — and it is scored as *"spent no NPCI slot on a case that must not be debited"*, not as "did nothing", because refusing the debit and refusing the customer are different decisions.
-
-## Baseline assumptions
-
-The comparison is only worth anything if the control is fair, so both readings are scored.
-
-| Baseline | Assumption |
-| --- | --- |
-| `t3_calendar` | Retries every failure class on T+1, T+2, T+3, including revoked mandates. Razorpay's [Payment Retries doc](https://razorpay.com/docs/payments/subscriptions/payment-retries/) lists mandate cancellation as a failure reason and describes automatic retries with no carve-out. |
-| `t3_hard_decline_aware` | Charitable reading: the cycle stops after one hard decline. |
-
-Reported lift has to survive both. If it only existed against the harsher reading, it would not be real.
-
-Two rules bind the baseline and us identically, because they are facts about the rails rather than policy choices. Razorpay does not permit a merchant-initiated charge on an Indian domestic card, so neither policy can debit one. And the calendar's failure emails carry a hosted card-change link, which is a real recovery channel — so it is credited whenever the money is there on the day the email goes out, on the same test our own links are scored on. Crediting only our links would be scoring our own exam; it is worth about ₹15k of the calendar's recovery on this batch.
-
-Involuntary churn counts only subscriptions that were **recoverable** and ended halted anyway. Halting a revoked mandate is correct behaviour, not churn, and both policies are scored with the same rule.
-
-## Uncollected invoices on revived subscriptions
-
-From the same doc:
-
-> If the customer successfully changes the card details when a Subscription is in the halted state, it moves to the active state. Invoices for such Subscriptions are still created. However, **we will not charge these invoices. You will have to charge them manually.**
-
-So a customer comes back, fixes their card, the subscription revives — and the unpaid invoices from the halted window sit there until a human notices. Piplup treats this as its own decline class (`uncollected`) with its own intervention (`back_charge_invoices`).
-
-This money is invisible to the retry cycle, which inflates our lift in a way that deserves calling out rather than hiding, so `npm run evaluate` reports the sweep separately and as a share of total incremental lift.
-
-## Compliance
-
-RBI requires the customer to be notified 24 hours before an auto-debit. The original billing-day attempt is covered by its own notice, but moving a debit to a new date needs a fresh one — which can push the debit itself a day later. The policy engine models this: see `applyPreDebitNotice` in [src/lib/recovery/policy.ts](src/lib/recovery/policy.ts).
-
-Razorpay also does not permit manual charge on an Indian domestic card. For those cases the policy engine will not schedule a retry at all; the only compliant path is a link the customer completes themselves.
-
-## Inbound replies
-
-Customers answer in Hinglish. `parseReply` turns a free-text message into a typed intent — promise to pay, dispute, opt-out, already paid, or unclear — with a confidence score. Anything below 0.6 confidence is ignored rather than acted on.
-
-Two cases in the batch look like ordinary insufficient-funds failures and are only revealed as do-not-touch by their reply (`"ye charge galat hai"` and `"stop karo, mat bhejo"`). A policy that ignores inbound text retries both.
-
-## Env
-
-Copy `.env.example` to `.env.local` with **test-mode** keys (`rzp_test_…`). Live keys are refused.
+## Run
 
 ```bash
-npm run recover:demo
+npm install
+npm run evaluate   # A/B harness — clone and verify the numbers
+npm run dev        # desk on :3000
 ```
 
-That mints three Test Mode Payment Links (expired card, paused mandate, checkout drop) after the policy grant. Test accounts allow 30 links total, so we never create one per batch row. Links also appear from the dashboard button on [http://localhost:3000](http://localhost:3000). Check them under Payment Links in the Razorpay dashboard.
+Optional, **test-mode** keys only (`rzp_test_…`). Copy `.env.example` to `.env.local`.
 
-## Docs
+```bash
+npm run recover:demo   # three Payment Links after the policy grant
+```
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) — two loops, grant gate, file map. Same diagram at [`/architecture`](http://localhost:3000/architecture).
-- [DEMO.md](./DEMO.md) — 5-minute pitch shot list. Not a script.
+Test accounts allow 30 links. We never mint one per batch row.
 
-## Pitch video
+---
 
-Track 03 wants measured recovery across a batch, stopping rules, and an audit trail. Record against `/architecture` first, then the desk, then `/lab`. Follow [DEMO.md](./DEMO.md).
+## Repository
+
+```
+src/lib/recovery/        engine — grant, windows, ladder, evaluate
+src/lib/razorpay/        test-mode Payment Links + webhook ledger
+src/lib/autopilot/       night queue that drives the desk
+src/lib/email/           reminder copy + send
+src/components/desk/     dashboard (one file per tab)
+src/components/insights/ Reports + Smart Prevent
+src/components/lab/      timing grid and live mint
+src/app/                 routes and APIs only
+scripts/evaluate.ts      the proof
+```
+
+Start at [`src/lib/recovery/policy.ts`](src/lib/recovery/policy.ts) and [`scripts/evaluate.ts`](scripts/evaluate.ts). The file table in [ARCHITECTURE.md](./ARCHITECTURE.md) maps each box to a path.
+
+**Stack:** Next.js 15, TypeScript, Razorpay Test Mode, Nodemailer.
