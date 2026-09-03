@@ -1,7 +1,5 @@
 import Link from "next/link";
-import { LadderCompare } from "@/app/LadderCompare";
-import { RecoverLive } from "@/app/RecoverLive";
-import { TimingModel } from "@/app/TimingModel";
+import { LadderCompare, RecoverLive, TimingModel } from "@/components/lab";
 import { sweepEnvelopes } from "@/lib/recovery/benchmark";
 import { evaluateBatch } from "@/lib/recovery/evaluate";
 import { CALENDAR_PRESENT_HOUR } from "@/lib/recovery/simulate";

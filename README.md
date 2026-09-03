@@ -23,6 +23,26 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Repo map
+
+Routes stay in `src/app`. Everything a reviewer actually reads lives next to its job.
+
+```
+src/
+  lib/recovery/        engine — grant, windows, ladder, evaluate
+  lib/razorpay/        test-mode Payment Links + webhook ledger
+  lib/autopilot/       night queue that drives the desk
+  lib/email/           reminder copy + send
+  lib/merchant/        Eureka Labs fixture
+  components/desk/     Ada's dashboard (one file per tab body)
+  components/insights/ Reports + Smart Prevent
+  components/lab/      timing grid, ladder vs T+3, live mint
+  app/                 `/`, `/lab`, `/architecture`, APIs only
+scripts/evaluate.ts    A/B harness on the 112-case book
+```
+
+Start at [`src/lib/recovery/policy.ts`](src/lib/recovery/policy.ts) (the grant gate) and [`scripts/evaluate.ts`](scripts/evaluate.ts) (the proof). The file table in [ARCHITECTURE.md](./ARCHITECTURE.md) maps each box to a path.
+
 ## What `npm run evaluate` proves
 
 On the seeded batch, Adaptive Recovery should:

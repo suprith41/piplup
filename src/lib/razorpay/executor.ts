@@ -5,7 +5,7 @@ import { seedBatch } from "../recovery/seed.ts";
 import { exposurePaise } from "../recovery/simulate.ts";
 import type { RecoveryCase } from "../recovery/types.ts";
 import { appendAudit, findLink, liveLinks, type AuditLine } from "./audit.ts";
-import { createPaymentLink, isLinkCapError, TEST_MODE_LINK_CAP, type CreatedLink } from "./client.ts";
+import { createPaymentLink, isLinkCapError, TEST_MODE_LINK_CAP } from "./client.ts";
 
 const LINK_MUTATIONS = new Set(["payment_link", "mandate_reauth"]);
 

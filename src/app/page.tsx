@@ -1,4 +1,4 @@
-import { Desk } from "@/app/Desk";
+import { Desk } from "@/components/desk";
 
 export const dynamic = "force-dynamic";
 

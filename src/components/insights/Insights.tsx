@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { DistBar, HBar, StackedBars, type StackKey } from "@/app/charts";
-import { CountInt, CountPct, CountRupees } from "@/app/motion";
+import { DistBar, HBar, StackedBars, type StackKey } from "@/components/insights/charts";
+import { CountInt, CountPct, CountRupees } from "@/components/insights/motion";
 import { formatINR } from "@/lib/recovery/taxonomy";
 
 type Breakdown = {

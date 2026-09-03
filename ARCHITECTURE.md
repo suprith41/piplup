@@ -101,7 +101,7 @@ flowchart LR
 | Prevent | [`src/lib/recovery/prevent.ts`](src/lib/recovery/prevent.ts) | Failures that are already certain, three days out. |
 | Analytics | [`src/lib/recovery/analytics.ts`](src/lib/recovery/analytics.ts) | Same book the desk ran. No second pipeline. |
 | Executor | [`src/lib/razorpay/executor.ts`](src/lib/razorpay/executor.ts) | Test-mode links only. Live keys refused. |
-| Desk | [`src/app/Desk.tsx`](src/app/Desk.tsx) | What Ada sees: Payments, Customers, Settlements, Disputes, Reports, Smart Prevent. |
+| Desk | [`src/components/desk/Desk.tsx`](src/components/desk/Desk.tsx) | Night-loop shell. Tab bodies: `payments.tsx`, `boards.tsx`. Reports / Prevent sit in `src/components/insights`. |
 
 ## Three ways to act, plus a freeze
 
@@ -275,7 +275,8 @@ ageing. Channel cost is modelled for WhatsApp and SMS; only email is actually se
 ## How a reviewer walks this
 
 1. Read this file (or `/architecture`) for the two loops and the grant gate.
-2. Run `npm run evaluate` — same 112 cases, two T+3 readings, Adaptive.
-3. Open `/` and watch Cycle 47 land on the desk.
-4. Open Disputes to see a correct freeze, then Reports for measured volume.
-5. Open `/lab` for the timing grid and the ladder next to T+3.
+2. Open [`src/lib/recovery/policy.ts`](src/lib/recovery/policy.ts), then [`scripts/evaluate.ts`](scripts/evaluate.ts). The rest of `src/lib/recovery/` is one file per box in the table above.
+3. Run `npm run evaluate` — same 112 cases, two T+3 readings, Adaptive.
+4. Open `/` and watch Cycle 47 land on the desk (`src/components/desk`).
+5. Open Disputes to see a correct freeze, then Reports for measured volume.
+6. Open `/lab` for the timing grid and the ladder next to T+3.
