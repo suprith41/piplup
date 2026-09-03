@@ -33,15 +33,15 @@ export default function ArchitecturePage() {
         .arch, .arch * { font-family: Virgil, "Segoe Print", cursive !important; }
       `}</style>
 
-      <header className="flex shrink-0 items-baseline justify-between px-6 pt-3">
-        <p className="text-sm text-[#6b7288]">Piplup · Eureka Labs</p>
-        <p className="text-sm text-[#6b7288]">112 students · vs T+3</p>
+      <header className="flex shrink-0 items-baseline justify-between gap-4 bg-[#305eff] px-5 py-1.5 text-[12px] text-white">
+        <p>Piplup · Eureka Labs</p>
+        <p className="min-w-0 truncate text-white/85">
+          One line through the night. Fail → read → Piplup picks one clock → we act → we prove → we prevent.
+        </p>
+        <p className="shrink-0">112 students · vs T+3</p>
       </header>
-      <p className="shrink-0 px-6 pb-1.5 text-[13px] text-[#5a6178]">
-        One line through the night. Fail → read → Piplup picks one clock → we act → we prove → we prevent.
-      </p>
 
-      <div className="mx-5 mb-2 grid min-h-0 flex-1 grid-cols-[1fr_2.75rem_1.2fr_2.75rem_1fr] grid-rows-[minmax(0,1fr)_1.75rem_auto] gap-x-0">
+      <div className="mx-5 mb-2 mt-4 grid min-h-0 flex-1 grid-cols-[1fr_2.75rem_1.2fr_2.75rem_1fr] grid-rows-[minmax(0,1fr)_1.75rem_auto] gap-x-0">
         <Frame title="1 · READ">
           <VFlow>
             <Node k="INGRESS" h="It bounced" p="Razorpay fail, or the student texts." />
@@ -105,16 +105,12 @@ export default function ArchitecturePage() {
         </Frame>
       </div>
 
-      <footer className="flex shrink-0 items-center justify-between bg-[#02042b] px-6 py-2 text-[13px] text-white">
-        <p>
-          <span className="text-[#9db4ff]">AI sits on PARSE only.</span> It never classifies, never grants, never
-          touches money.
-        </p>
-        <div className="flex gap-4 text-white/40">
-          <Link href="/" className="hover:text-white">
+      <footer className="flex shrink-0 items-center justify-end px-6 py-2 text-[13px]">
+        <div className="flex gap-4 text-[#8c93a3]">
+          <Link href="/" className="hover:text-[#02042b]">
             Desk
           </Link>
-          <Link href="/lab" className="hover:text-white">
+          <Link href="/lab" className="hover:text-[#02042b]">
             Lab
           </Link>
         </div>
